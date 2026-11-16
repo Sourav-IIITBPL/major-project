@@ -1,0 +1,19 @@
+Hardware Cost Auto-Profiler – Calibration Report
+=================================================================
+Python     : 3.12.3
+Platform   : linux
+Iterations : 2,000
+
+Calibrated Cost Coefficients (use these in generate_dataset.py):
+  cost_sqr  = 1.0
+  cost_mult = 1.1367
+  cost_ctrl = 0.0209
+
+Per Bit-Length Results:
+    256-bit: sqr=532.5ns  mult=598.7ns  ctrl=75.5ns  (mult/sqr=1.124, ctrl/sqr=0.142)
+    512-bit: sqr=1825.8ns  mult=1301.4ns  ctrl=72.4ns  (mult/sqr=0.713, ctrl/sqr=0.040)
+   1024-bit: sqr=2906.0ns  mult=3281.2ns  ctrl=73.3ns  (mult/sqr=1.129, ctrl/sqr=0.025)
+   2048-bit: sqr=8963.5ns  mult=10990.9ns  ctrl=75.9ns  (mult/sqr=1.226, ctrl/sqr=0.009)
+
+compute_hw_cost formula:
+  hw_cost = sqrs*cost_sqr + mults*cost_mult + precomp_mults*cost_mult + iters*cost_ctrl

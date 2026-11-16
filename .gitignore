@@ -1,0 +1,63 @@
+# =============================================================================
+# Git Ignore for ML-Assisted Adaptive Cryptographic Engine
+# =============================================================================
+
+# --- Virtual Environments ---
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# --- Python Bytecode & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.egg-info/
+develop-eggs/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+
+# --- Node / React Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Operating System & File Transfer Artifacts ---
+*.Zone.Identifier
+*:Zone.Identifier
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# --- IDEs & Editors ---
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# --- Logs & Temporary Files ---
+*.log
+*.tmp
+*.bak

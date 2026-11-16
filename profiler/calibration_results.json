@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "iterations": 2000,
+    "platform": "linux",
+    "python_version": "3.12.3"
+  },
+  "per_bit_length": {
+    "256": {
+      "sqr_ns": 532.48,
+      "mult_ns": 598.74,
+      "ctrl_ns": 75.49,
+      "scan_ns": 6938.75,
+      "ratio_mult_to_sqr": 1.1244,
+      "ratio_ctrl_to_sqr": 0.1418
+    },
+    "512": {
+      "sqr_ns": 1825.75,
+      "mult_ns": 1301.43,
+      "ctrl_ns": 72.41,
+      "scan_ns": 13560.45,
+      "ratio_mult_to_sqr": 0.7128,
+      "ratio_ctrl_to_sqr": 0.0397
+    },
+    "1024": {
+      "sqr_ns": 2905.98,
+      "mult_ns": 3281.23,
+      "ctrl_ns": 73.28,
+      "scan_ns": 26297.67,
+      "ratio_mult_to_sqr": 1.1291,
+      "ratio_ctrl_to_sqr": 0.0252
+    },
+    "2048": {
+      "sqr_ns": 8963.45,
+      "mult_ns": 10990.94,
+      "ctrl_ns": 75.89,
+      "scan_ns": 54194.15,
+      "ratio_mult_to_sqr": 1.2262,
+      "ratio_ctrl_to_sqr": 0.0085
+    }
+  },
+  "calibrated_coefficients": {
+    "cost_sqr": 1.0,
+    "cost_mult": 1.1367,
+    "cost_ctrl": 0.0209,
+    "description": "hw_cost = sqrs*cost_sqr + mults*cost_mult + precomp_mults*cost_mult + iters*cost_ctrl"
+  },
+  "summary": {
+    "original_hardcoded": {
+      "cost_sqr": 1.0,
+      "cost_mult": 1.2,
+      "cost_ctrl": 0.15
+    },
+    "measured_on_this_machine": {
+      "cost_sqr": 1.0,
+      "cost_mult": 1.1367,
+      "cost_ctrl": 0.0209,
+      "description": "hw_cost = sqrs*cost_sqr + mults*cost_mult + precomp_mults*cost_mult + iters*cost_ctrl"
+    },
+    "mult_ratio_change_pct": -5.27,
+    "ctrl_ratio_change_pct": -86.07
+  }
+}
