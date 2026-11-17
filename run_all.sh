@@ -77,6 +77,12 @@ case "${1:-all}" in
     cd frontend && npm run dev
     ;;
 
+  deploy)
+    echo "=== Starting Unified Production Deployment ==="
+    ./deploy.sh
+    ;;
+
+
   all)
     echo "============================================================"
     echo "  Running ALL Enhancements in Sequence"
@@ -109,7 +115,7 @@ case "${1:-all}" in
     ;;
 
   *)
-    echo "Usage: bash run_all.sh [setup|dataset|train|test-rsa|profile|backends|api|frontend|all]"
+    echo "Usage: bash run_all.sh [setup|dataset|train|test-rsa|profile|backends|api|frontend|deploy|all]"
     exit 1
     ;;
 esac

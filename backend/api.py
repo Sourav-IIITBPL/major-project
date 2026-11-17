@@ -153,8 +153,10 @@ class BackendDispatchRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+# API Routes
+# ---------------------------------------------------------------------------
 
-@app.get("/", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 def health():
     return {
         "status": "online",
@@ -162,6 +164,7 @@ def health():
         "version": "2.0.0",
         "supported_backends": list(BACKEND_CONFIGS.keys()),
     }
+
 
 
 @app.post("/api/generate-exponent", tags=["Core"])
@@ -545,5 +548,25 @@ def _generate_rationale(feats: dict, strategy: str) -> str:
 frontend_dist = os.path.join(ROOT, "frontend", "dist")
 if os.path.isdir(frontend_dist):
     from fastapi.staticfiles import StaticFiles
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static_frontend")
+    from fastapi.responses import FileResponse
+
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="static_assets")
+
+    @app.get("/", include_in_schema=False)
+    def serve_frontend_index():
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa_fallback(full_path: str):
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/", tags=["Health"])
+    def root_fallback():
+        return health()
+
 

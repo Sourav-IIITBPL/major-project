@@ -139,14 +139,19 @@ bash run_all.sh setup
 
 ### 4.2 Launch the Interactive Web Dashboard
 ```bash
-# Terminal 1: Launch FastAPI Backend (http://localhost:8000)
-bash run_all.sh api
+# Option A: Unified Single-Port Production Mode (Port 8000 serves BOTH Frontend & Backend)
+./deploy.sh
 
-# Terminal 2: Launch React Frontend (http://localhost:3000)
-bash run_all.sh frontend
+# Option B: Docker Container Deployment (Zero Dependencies)
+docker compose up -d
+
+# Option C: Dual Development Mode (Hot Reload on Port 3000 & 8000)
+./deploy.sh --dev
 ```
+* **Production Web UI & APIs:** Open `http://localhost:8000` (serves compiled React 19 UI & REST APIs).
 * **Interactive API Documentation:** Open `http://localhost:8000/docs` in your browser.
-* **Web UI Dashboard:** Open `http://localhost:3000` to interact with the live engine.
+* **Complete Deployment Guide:** See [docs/DEPLOYMENT_GUIDE.md](file:///home/sourav/major-project/docs/DEPLOYMENT_GUIDE.md) for Linux VPS (systemd + Nginx) and Cloud hosting (Render/Railway).
+
 
 ### 4.3 Run CLI Pipeline & Test Suites
 ```bash
