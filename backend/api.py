@@ -536,3 +536,14 @@ def _generate_rationale(feats: dict, strategy: str) -> str:
     elif strategy == "VLIM":
         return f"Adaptive VLIM selected: High zero density ({zero_density:.1%}) enables aggressive zero-run batch squarings, compressing loop cycles by 50-87%."
     return "Optimized routing via compiled Decision Tree graph."
+
+
+# ---------------------------------------------------------------------------
+# Static Frontend Serving (Unified Production Deployment)
+# ---------------------------------------------------------------------------
+
+frontend_dist = os.path.join(ROOT, "frontend", "dist")
+if os.path.isdir(frontend_dist):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static_frontend")
+

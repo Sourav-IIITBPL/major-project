@@ -1,0 +1,77 @@
+Indian Institute of Information Technology
+Bhopal (M.P.)
+(Electronics and Communication Engineering)
+
+Instructions for Major Project (Phase-1) ECE-413
+1. All students should bring hard copy of project synopsis signed by project supervisor and all
+students in the given format.
+2. Each group should also prepare presentation of 5 to 10 minutes containing around 10 slides in
+ppt presented by each member of the group. Presentation is followed by question answer
+session by the faculties present at time.
+3. The report should be typed in 1.5 space on one side of the A4 size sheet and the pages should
+be numbered serially.
+4. About 1" margin on all the four sides of the sheet.
+5. Same fonts should be used throughout the document preferably “Times new roman”.
+6. Use 12 size font for normal text, 14 size for heading and 16 size for super heading some time
+18 size can be used for chapter name. In any case do not use font more than 22 size.
+7. All tables and figures must be captioned. In case of figures put caption below the figure and
+In case of tables put cation above the table.
+8. Number of Copies: Two (one for the department, one for the Institute).
+9. Student must keep one copy of himself. The report should be submitted in strip file or spiral
+bound.
+Following guidelines can be used while writing the report:
+i.
+ii.
+iii.
+iv.
+v.
+
+Write the first draft, take reasonable care in the choice of words and sentence structure;
+choose simple and familiar words.
+Write smaller sentences instead of long ones with a number of clauses. Avoid
+unnecessary words and phrase.
+Avoid repetition, redundancy and make sure that message flows smoothly.
+The draft of the report should be given to the faculty and also to the professional experts.
+In the light of these corrections and suggestions, prepare second draft and ensure that it is
+in the desired format and structure.
+
+A formal report usually contains the following elements:
+Introduction
+In Introduction, the problem is defined and introduced. The Introduction therefore contains the
+purpose of writing the report and sufficient background material, including the literature surveyed to
+present the reader a clear picture of the project work. A paraphrased outline of the work should also
+form a part of the Introduction. In the Introduction of a report the author discussion on the scope, and
+the limitations of work should be made. It is also required to discuss the sources, methods and
+procedure employed in collecting and organizing the data. The student is also expected to highlight
+the value of his work besides indicating the need for writing the report.
+A proper and effective Introduction should include a brief history of the problem under discussion,
+coupled with the statement of the immediate problem under examination, the reasons for undertaking
+
+it and a discussion of the methodology adopted. Generally, for internship project report, an
+Introduction may not be more than a couple of pages.
+Main Text
+The actual work, the method of treatment and the results are presented in this part of report. It may
+run into many sections, sub-sections and sub-sub sections under different headings and sub-headings.
+That should be numbered and phrased appropriately. In order to maintain consistency, insist the
+students to follow the same pattern as given in the table of contents of report.
+The main text contains the discussion on the experimental work done or the data collected, the
+survey done, a description of activities, analysis and the results obtained. It also includes illustrations
+and interpretations. This is the main body of the report. All illustrations (graphs, diagrams, tables,
+figures, etc.) should always be accompanied by a number and an appropriate title. This helps the
+reader to understand the illustration in a better way. It also helps the writer to refer to these in the
+subsequent discussion.
+Significant discrepancies in results should be called to the reader's attention, even when it is
+admitted that no reasonable explanation can be offered. If the author himself discovers these
+discrepancies and does not mention them, the technical credibility of the report gets adversely
+affected.
+Conclusions
+The conclusions would be helpful to the reader if other possibilities pertaining to the stated
+conclusions and recommendations are also discussed. The purpose of the conclusions is to draw the
+attention of the reader to significant findings. Sometimes conclusions contain a very brief summary
+of the main discussion. Recommendations suggest ways and means of bringing about improvement
+to the present work.
+
+Dr. Jogendra Singh Rana
+Major Project Coordinator (ECE), IIIT Bhopal
+
+

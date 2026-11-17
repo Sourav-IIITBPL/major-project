@@ -1,0 +1,277 @@
+TITLE OF THE PROJECT
+MAJOR PROJECT SYNOPSIS
+Submitted in partial fulfillment for the award of the degree of
+
+BACHELOR OF TECHNOLOGY
+(Electronics and Communication Engineering)
+Submitted to
+INDIAN INSTITUTE OF INFORMATION TECHNOLOGY
+BHOPAL (M.P.)
+
+Submitted by
+Name of the student1 (Scholar number)
+Name of the student2 (Scholar number)
+Name of the student3 (Scholar number)
+Name of the student4 (Scholar number)
+
+Under the supervision of
+Name of the supervisor
+Assistant Professor
+(Electronics and Communication Engineering)
+
+Month & Year
+
+INDIAN INSTITUTE OF INFORMATION TECHNOLOGY
+BHOPAL
+
+CERTIFICATE
+This is to certify that the Major project synopsis entitled “TITLE OF THE PROJECT”,
+submitted by Name of student1, Name of student2, Name of student3, and Name of
+student4 in partial fulfillment of the requirements for the award of the degree of Bachelor of
+Technology
+
+in Electronics and Communication Engineering. This document is
+
+comprehensive planning of the proposed work of need to be completed in final semester for
+final evaluation.
+
+Date:
+
+Name of Supervisor
+Designation, Department
+IIIT Bhopal
+
+Dr. Jogendra Singh Rana
+Major Project coordinator
+Electronics and Communication Engineering
+
+IIIT Bhopal
+
+INDIAN INSTITUTE OF INFORMATION TECHNOLOGY
+BHOPAL
+
+DECLARATION
+We hereby declare that the following major project synopsis entitled “PROJECT TITLE”
+presented in the partial fulfillment of the requirements for the award of the degree of
+Bachelor of Technology in Electronics and Communication Engineering. It is an authentic
+documentation of our original work carried out under the guidance of Name of Supervisors.
+The work has been carried out entirely at the Indian Institute of Information Technology,
+Bhopal. The project work presented has not been submitted in part or whole to award of any
+degree or professional diploma in any other institute or organization.
+We, with this, declare that the facts mentioned above are true to the best of our knowledge. In
+case of any unlikely discrepancy that may occur, we will be the ones to take responsibility.
+
+Name of the student1 (Scholar number)
+
+Sign of student1
+
+Name of the student2 (Scholar number)
+
+Sign of student2
+
+Name of the student3 (Scholar number)
+
+Sign of student3
+
+Name of the student4 (Scholar number)
+
+Sign of student4
+
+AREA OF WORK (Sample)
+
+Our project will mainly focus on BIG DATA and MACHINE LEARNING using a set of tools
+and technologies that are required for development of large-scale architectures.
+While one may argue that the same thing could have been done using big data, but that’s
+where the real catch is. As it is already mentioned that the tools and architecture we’ll be
+using mainly focus on large scale deployments.
+It’s been a fairly long period since humans started computing and then extracting useful
+insights from the data, but in past decade the immense growth in data has posed a serious
+challenge for computing that’s where big data came and with time we also acquired the
+capacity to process real time massive data sets and ever since it’s just keeps growing bigger
+and bigger.
+In our project we’ll be looking at architecture of real time data pipeline and we’ll also look
+at analysis of big data using spark mlib.
+
+LIST OF FIGURES
+Fig No. Description
+1
+
+Stream Processing Pipeline
+
+2
+
+Lambda Architecture
+
+3
+
+Kappa Architecture
+
+4
+
+HDFS Architecture
+
+5
+
+Streaming Data Pipeline
+
+6
+
+Kafka Producer & Consumer
+
+7
+
+Multiple Node Multiple Broker Cluster
+
+8
+
+Output of Clusters
+
+9
+
+Output of Clusters for Analysis
+
+Page no.
+
+LIST OF TABLES
+Table No.
+
+Description
+
+1
+
+Comparison of Data Ingestion Methods
+
+2
+
+Analysis of Clusters
+
+Page no.
+
+ABBREVIATIONS
+
+TABLE OF CONTENT
+
+S. No
+
+Title
+
+Page No.
+
+Certificate
+
+i
+
+Declaration
+
+ii
+
+Area of work
+List of Figures
+List of Table
+Abbreviations
+
+iii
+iv
+v
+vi
+
+1
+
+Introduction
+
+1
+
+2
+
+Literature review or Survey
+
+2
+
+3
+
+Methodology & Work Description
+
+3
+
+4
+
+Proposed algorithm
+
+4
+
+5
+
+Proposed flowchart/ DFD/ Block Diagram
+
+5
+
+6
+
+Tools & Technology Used
+
+6
+
+7
+
+Implementation & Coding
+
+7
+
+8
+
+Result and Discussions
+
+8
+
+9
+
+Conclusion & Future Scope
+
+9
+
+10
+
+References
+
+10
+
+INTRODUCTION
+
+1
+
+LITERATURE REVIEW
+
+2
+
+PROPOSED METHODOLOGY AND WORK
+DESCRIPTION
+
+3
+
+PROPOSED ALGORITHMS
+
+4
+
+PROPOSED FLOWCHART/ DFD/ BLOCK
+DIAGRAM
+
+5
+
+TOOLS AND TECHNOLOGY
+USED
+
+6
+
+RESULTS AND DISCUSSIONS
+
+7
+
+CONCLUSION AND FUTURE SCOPE
+
+8
+
+REFERENCES
+
+9
+
+

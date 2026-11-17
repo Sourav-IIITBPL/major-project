@@ -1,0 +1,70 @@
+Indian Institute of Information Technology Bhopal
+B. Tech
+Major Project-Phase -1
+Note: Instructions for Major Project (Phase-1) of B. Tech ECE 7th Semester.
+1. Scheme of major project is given here as follows:
+Scheme of Studies Periods Per Week
+Course No.
+Subject
+L
+T
+P
+Credits
+EC 413
+Major Project
+4
+2
+2. Students need to submit the project title and abstract, group details, and consent of supervisor(s) to the
+department by 2nd week of supervisor allotment.
+3. Evaluation will be carried out on the following components:
+Continuous Evaluation
+End Term Evaluation
+(last week of each month)
+(at the time of end term exam)
+E1
+E2
+E3
+E4
+Coding and Results Project File Presentation
+(Marks)
+(Marks)
+(Marks)
+(Marks)
+(Marks)
+(Marks)
+(Marks)
+10
+10
+10
+10
+20
+20
+20
+
+Total
+Marks
+100
+
+4. Students must report the progress of minor project to the respective supervisor(s) at least once in a week.
+5. Final project file must be have following sections:
+a. Introduction of the Project [ 3-5 pages ]
+b. Background Details and Literature [ 4-8 pages ]
+c. Description of System Model and Framework [ 4-8 pages ]
+d. Description of Methodology and Algorithm [ 4-8 pages ]
+e. Implementation Details and Comparative Result Analysis [ 5-10 pages ]
+f.
+
+Conclusion and Future Scope [ 2- 3 pages ]
+
+g. References. [ 2- 3 pages]
+NOTE: - Project file format criteria are as follows: page size: A4, font: 11, times news roman, line height: 1.5, page
+margin: 1.5 etc. Content plagiarism must be less than 15%. All tables, figures and diagrams must be self-designed.
+
+6. Continuous evaluation will be carried out by the respective supervisor(s) and marks will be submitted to
+the department by the end of each month.
+7. End-Term evaluation will be carried out by respective supervisor(s) with project coordinator and other
+faculties present in presentation/viva.
+Faculty Coordinator (Major Project)
+ECE, IIIT Bhopal
+
+
