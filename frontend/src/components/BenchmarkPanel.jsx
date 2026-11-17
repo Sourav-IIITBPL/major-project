@@ -2,203 +2,340 @@ import React, { useState } from 'react'
 import axios from 'axios'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, Cell
+  ResponsiveContainer, Cell
 } from 'recharts'
 
-const card = {
-  background: 'rgba(26,31,46,0.8)', border: '1px solid #2d3748',
-  borderRadius: '12px', padding: '24px', marginBottom: '20px',
-}
-const label = { fontSize: '13px', color: '#a0aec0', marginBottom: '6px', fontWeight: 600 }
-const select = {
-  background: '#0f1117', border: '1px solid #2d3748', borderRadius: '8px',
-  padding: '10px 14px', color: '#e2e8f0', fontSize: '13px', outline: 'none', width: '100%'
-}
-const btn = {
-  background: 'linear-gradient(90deg, #2563eb, #7c3aed)', color: 'white',
-  border: 'none', borderRadius: '8px', padding: '10px 24px',
-  cursor: 'pointer', fontWeight: 700, fontSize: '14px',
+const STRATEGY_COLORS = {
+  fixed_binary:     '#dc2626',
+  fixed_naf:        '#d97706',
+  fixed_wnaf:       '#2563eb',
+  fixed_vlim:       '#7c3aed',
+  ml_adaptive:      '#059669',
+  hybrid_sliced:    '#d97706',
+  blinded_adaptive: '#0284c7',
 }
 
-const MODE_COLORS = {
-  fixed_binary: '#e74c3c', fixed_naf: '#e67e22', fixed_wnaf: '#3498db',
-  fixed_vlim: '#9b59b6', ml_adaptive: '#2ecc71', hybrid_sliced: '#f39c12', blinded_adaptive: '#1abc9c'
-}
-const MODE_LABELS = {
-  fixed_binary: 'Binary', fixed_naf: 'NAF', fixed_wnaf: 'wNAF',
-  fixed_vlim: 'VLIM', ml_adaptive: 'ML-Adaptive', hybrid_sliced: 'Hybrid-Sliced', blinded_adaptive: 'Blinded-Adaptive'
+const STRATEGY_NAMES = {
+  fixed_binary:     'Binary (Baseline)',
+  fixed_naf:        'Standard NAF',
+  fixed_wnaf:       'Windowed NAF (w=3)',
+  fixed_vlim:       'Adaptive VLIM',
+  ml_adaptive:      'ML-Adaptive (Ours)',
+  hybrid_sliced:    'Hybrid Sliced',
+  blinded_adaptive: 'Blinded-Adaptive (Secure)',
 }
 
 export default function BenchmarkPanel() {
-  const [bitLen,  setBitLen]  = useState('1024')
+  const [bitLen, setBitLen] = useState('1024')
   const [profile, setProfile] = useState('uniform')
-  const [trials,  setTrials]  = useState('3')
-  const [data,    setData]    = useState(null)
+  const [trials, setTrials] = useState('1')
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [error, setError] = useState('')
 
-  const run = async () => {
-    setLoading(true); setError(''); setData(null)
+  const handleRun = async () => {
+    setLoading(true)
+    setError('')
+    setData(null)
     try {
-      const { data: res } = await axios.post('/api/benchmark', {
-        bit_length: parseInt(bitLen),
-        profile,
-        trials: parseInt(trials),
+      const res = await axios.post('/api/benchmark', {
+        bit_length: parseInt(bitLen, 10),
+        profile: profile,
+        trials: parseInt(trials, 10),
       })
-      setData(res)
-    } catch (e) {
-      setError(e.response?.data?.detail || e.message)
+      setData(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Benchmark execution failed.')
     } finally {
       setLoading(false)
     }
   }
 
-  const timeChartData = data?.results.map(r => ({
-    name: MODE_LABELS[r.mode] || r.mode,
-    'Time (ms)': r.avg_time_ms,
-    color: MODE_COLORS[r.mode] || '#ccc',
+  const chartLatency = data?.results.map(r => ({
+    name: STRATEGY_NAMES[r.mode] || r.mode,
+    latency: r.avg_time_ms,
+    mode: r.mode,
   })) || []
 
-  const multsChartData = data?.results.map(r => ({
-    name: MODE_LABELS[r.mode] || r.mode,
-    'Multiplications': r.avg_mults,
-    color: MODE_COLORS[r.mode] || '#ccc',
+  const chartMults = data?.results.map(r => ({
+    name: STRATEGY_NAMES[r.mode] || r.mode,
+    mults: r.avg_mults,
+    mode: r.mode,
   })) || []
 
   return (
-    <div>
-      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px' }}>
-        📊 Live Multi-Strategy Benchmark
-      </h2>
-
-      {/* Controls */}
-      <div style={card}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' }}>
-          <div>
-            <div style={label}>Bit Length</div>
-            <select style={select} value={bitLen} onChange={e => setBitLen(e.target.value)}>
-              {['256','512','1024','2048'].map(b => (
-                <option key={b} value={b}>{b}-bit</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <div style={label}>Exponent Profile</div>
-            <select style={select} value={profile} onChange={e => setProfile(e.target.value)}>
-              {['uniform','sparse','dense','bursty','alternating'].map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <div style={label}>Trials (averaged)</div>
-            <select style={select} value={trials} onChange={e => setTrials(e.target.value)}>
-              {['1','2','3','5'].map(t => (
-                <option key={t} value={t}>{t} trial{t>1?'s':''}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <button style={{ ...btn, marginTop: '16px' }} onClick={run} disabled={loading}>
-          {loading ? '⏳ Running Benchmark… (may take 30–60s for large scales)' : '▶ Run Benchmark'}
-        </button>
-        {error && <div style={{ color: '#fc8181', marginTop: '10px', fontSize: '13px' }}>{error}</div>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Title */}
+      <div>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+          Comparative Cryptographic Benchmark Suite
+        </h1>
+        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+          Executes true RSA modular exponentiations across 7 strategies simultaneously, recording wall-clock latency, multiplications, and state-machine transitions.
+        </p>
       </div>
 
-      {/* Results */}
+      {/* Configuration Controls Card */}
+      <div style={{
+        backgroundColor: '#0f1422',
+        border: '1px solid #1e2638',
+        borderRadius: '10px',
+        padding: '20px',
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px',
+          alignItems: 'flex-end',
+        }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+              Cryptographic Scale
+            </label>
+            <select
+              value={bitLen}
+              onChange={e => setBitLen(e.target.value)}
+              style={{
+                width: '100%',
+                backgroundColor: '#161d2e',
+                border: '1px solid #273349',
+                color: '#e2e8f0',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            >
+              <option value="256">256-bit (ECC field scale)</option>
+              <option value="512">512-bit (Legacy RSA)</option>
+              <option value="1024">1024-bit (Standard RSA)</option>
+              <option value="2048">2048-bit (NIST Standard)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+              Exponent Topology
+            </label>
+            <select
+              value={profile}
+              onChange={e => setProfile(e.target.value)}
+              style={{
+                width: '100%',
+                backgroundColor: '#161d2e',
+                border: '1px solid #273349',
+                color: '#e2e8f0',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            >
+              <option value="uniform">Uniform Random</option>
+              <option value="dense">Dense Key (&gt;85% Ones)</option>
+              <option value="sparse">Sparse Key (&lt;15% Ones)</option>
+              <option value="bursty">Bursty Zero Clusters</option>
+              <option value="alternating">Alternating (101010...)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+              Statistical Iterations
+            </label>
+            <select
+              value={trials}
+              onChange={e => setTrials(e.target.value)}
+              style={{
+                width: '100%',
+                backgroundColor: '#161d2e',
+                border: '1px solid #273349',
+                color: '#e2e8f0',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            >
+              <option value="1">1 Run (Fastest)</option>
+              <option value="2">2 Runs (Averaged)</option>
+              <option value="3">3 Runs (Statistical)</option>
+            </select>
+          </div>
+
+          <div>
+            <button
+              onClick={handleRun}
+              disabled={loading}
+              style={{
+                width: '100%',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Evaluating...' : 'Execute Benchmark'}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ marginTop: '14px', fontSize: '13px', color: '#ef4444' }}>
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Results Section */}
       {data && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Charts Row */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+            gap: '20px',
+          }}>
             {/* Latency Chart */}
-            <div style={card}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: '#60a5fa' }}>
-                ⏱ Execution Latency (ms) — Lower is Better
-              </h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={timeChartData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: '#718096', fontSize: 11 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fill: '#a0aec0', fontSize: 11 }} width={100} />
-                  <Tooltip
-                    formatter={(v) => [`${v.toFixed(3)} ms`, 'Latency']}
-                    contentStyle={{ background: '#1a1f2e', border: '1px solid #2d3748', borderRadius: '8px', color: '#e2e8f0' }}
-                  />
-                  <Bar dataKey="Time (ms)" radius={[0,4,4,0]}>
-                    {timeChartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div style={{
+              backgroundColor: '#0f1422',
+              border: '1px solid #1e2638',
+              borderRadius: '10px',
+              padding: '20px',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '4px' }}>
+                Execution Latency (ms)
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+                Lower values indicate superior wall-clock performance.
+              </div>
+
+              <div style={{ width: '100%', height: '260px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartLatency} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2638" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: '#cbd5e1', fontSize: 11 }} width={140} />
+                    <Tooltip
+                      formatter={(val) => [`${val.toFixed(3)} ms`, 'Latency']}
+                      contentStyle={{ backgroundColor: '#0f1422', borderColor: '#273349', borderRadius: '6px', fontSize: '12px', color: '#f8fafc' }}
+                    />
+                    <Bar dataKey="latency" radius={[0, 4, 4, 0]}>
+                      {chartLatency.map((entry, idx) => (
+                        <Cell key={idx} fill={STRATEGY_COLORS[entry.mode] || '#38bdf8'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Multiplications Chart */}
-            <div style={card}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: '#a78bfa' }}>
-                ✖ Modular Multiplications — Lower is Better
-              </h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={multsChartData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: '#718096', fontSize: 11 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fill: '#a0aec0', fontSize: 11 }} width={100} />
-                  <Tooltip
-                    formatter={(v) => [`${v.toFixed(1)}`, 'Multiplications']}
-                    contentStyle={{ background: '#1a1f2e', border: '1px solid #2d3748', borderRadius: '8px', color: '#e2e8f0' }}
-                  />
-                  <Bar dataKey="Multiplications" radius={[0,4,4,0]}>
-                    {multsChartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div style={{
+              backgroundColor: '#0f1422',
+              border: '1px solid #1e2638',
+              borderRadius: '10px',
+              padding: '20px',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '4px' }}>
+                Modular Multiplications Count
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+                Primary determinant of hardware area and cryptographic power dissipation.
+              </div>
+
+              <div style={{ width: '100%', height: '260px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartMults} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2638" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: '#cbd5e1', fontSize: 11 }} width={140} />
+                    <Tooltip
+                      formatter={(val) => [val, 'Multiplications']}
+                      contentStyle={{ backgroundColor: '#0f1422', borderColor: '#273349', borderRadius: '6px', fontSize: '12px', color: '#f8fafc' }}
+                    />
+                    <Bar dataKey="mults" radius={[0, 4, 4, 0]}>
+                      {chartMults.map((entry, idx) => (
+                        <Cell key={idx} fill={STRATEGY_COLORS[entry.mode] || '#38bdf8'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
-          {/* Detailed Table */}
-          <div style={card}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: '#34d399' }}>
-              📋 Detailed Results — {data.bit_length}-bit {data.profile} ({data.trials} trials avg)
-            </h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #2d3748' }}>
-                    {['Strategy','Time (ms)','Speedup vs Binary','Multiplications','Mult Cut','Iterations','HW Cost'].map(h => (
-                      <th key={h} style={{ textAlign: h==='Strategy'?'left':'right', color: '#718096', padding: '8px 12px' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.results.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #1e2535', background: i%2===0?'transparent':'rgba(255,255,255,0.02)' }}>
-                      <td style={{ padding: '8px 12px' }}>
-                        <span style={{
-                          display: 'inline-block', width: '10px', height: '10px',
-                          borderRadius: '50%', background: MODE_COLORS[r.mode], marginRight: '8px'
-                        }} />
-                        {MODE_LABELS[r.mode]}
-                      </td>
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontFamily: 'monospace' }}>{r.avg_time_ms.toFixed(3)}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontFamily: 'monospace',
-                        color: r.speedup_pct > 0 ? '#34d399' : r.speedup_pct < 0 ? '#fc8181' : '#e2e8f0' }}>
-                        {r.speedup_pct > 0 ? '+' : ''}{r.speedup_pct.toFixed(1)}%
-                      </td>
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontFamily: 'monospace' }}>{r.avg_mults.toFixed(0)}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontFamily: 'monospace',
-                        color: r.mult_cut_pct > 0 ? '#34d399' : '#e2e8f0' }}>
-                        {r.mult_cut_pct > 0 ? '+' : ''}{r.mult_cut_pct.toFixed(1)}%
-                      </td>
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontFamily: 'monospace' }}>{r.avg_iters.toFixed(0)}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontFamily: 'monospace' }}>{r.avg_hw_cost.toFixed(1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Detailed Data Table */}
+          <div style={{
+            backgroundColor: '#0f1422',
+            border: '1px solid #1e2638',
+            borderRadius: '10px',
+            padding: '20px',
+            overflowX: 'auto',
+          }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '12px' }}>
+              Comparative Performance Metrics ({data.bit_length}-bit {data.profile})
             </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #273349', textAlign: 'left' }}>
+                  <th style={{ padding: '10px 12px', color: '#64748b', fontWeight: 600 }}>Strategy</th>
+                  <th style={{ padding: '10px 12px', color: '#64748b', fontWeight: 600, textAlign: 'right' }}>Latency (ms)</th>
+                  <th style={{ padding: '10px 12px', color: '#64748b', fontWeight: 600, textAlign: 'right' }}>Speedup</th>
+                  <th style={{ padding: '10px 12px', color: '#64748b', fontWeight: 600, textAlign: 'right' }}>Multiplications</th>
+                  <th style={{ padding: '10px 12px', color: '#64748b', fontWeight: 600, textAlign: 'right' }}>Mult Reduction</th>
+                  <th style={{ padding: '10px 12px', color: '#64748b', fontWeight: 600, textAlign: 'right' }}>State Transitions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.results.map((row, idx) => {
+                  const isWinner = row.mode === 'ml_adaptive'
+                  return (
+                    <tr key={idx} style={{
+                      borderBottom: '1px solid #151d2e',
+                      backgroundColor: isWinner ? 'rgba(5,150,105,0.08)' : idx % 2 === 0 ? '#0b0f19' : 'transparent',
+                    }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: STRATEGY_COLORS[row.mode] || '#e2e8f0' }}>
+                        {STRATEGY_NAMES[row.mode] || row.mode}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                        {row.avg_time_ms.toFixed(3)} ms
+                      </td>
+                      <td style={{
+                        padding: '10px 12px',
+                        textAlign: 'right',
+                        fontWeight: 600,
+                        color: row.speedup_pct > 0 ? '#10b981' : row.speedup_pct < 0 ? '#ef4444' : '#94a3b8',
+                      }}>
+                        {row.speedup_pct > 0 ? `+${row.speedup_pct}%` : `${row.speedup_pct}%`}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                        {row.avg_mults}
+                      </td>
+                      <td style={{
+                        padding: '10px 12px',
+                        textAlign: 'right',
+                        fontWeight: 600,
+                        color: row.mult_cut_pct > 0 ? '#10b981' : '#94a3b8',
+                      }}>
+                        {row.mult_cut_pct > 0 ? `-${row.mult_cut_pct}%` : `${row.mult_cut_pct}%`}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                        {row.avg_iters}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

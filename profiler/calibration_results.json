@@ -1,47 +1,47 @@
 {
   "meta": {
-    "iterations": 2000,
+    "iterations": 3000,
     "platform": "linux",
     "python_version": "3.12.3"
   },
   "per_bit_length": {
     "256": {
-      "sqr_ns": 532.48,
-      "mult_ns": 598.74,
-      "ctrl_ns": 75.49,
-      "scan_ns": 6938.75,
-      "ratio_mult_to_sqr": 1.1244,
-      "ratio_ctrl_to_sqr": 0.1418
+      "sqr_ns": 614.91,
+      "mult_ns": 608.23,
+      "ctrl_ns": 78.28,
+      "scan_ns": 7377.09,
+      "ratio_mult_to_sqr": 0.9891,
+      "ratio_ctrl_to_sqr": 0.1273
     },
     "512": {
-      "sqr_ns": 1825.75,
-      "mult_ns": 1301.43,
-      "ctrl_ns": 72.41,
-      "scan_ns": 13560.45,
-      "ratio_mult_to_sqr": 0.7128,
-      "ratio_ctrl_to_sqr": 0.0397
+      "sqr_ns": 1210.88,
+      "mult_ns": 1248.47,
+      "ctrl_ns": 78.16,
+      "scan_ns": 14336.79,
+      "ratio_mult_to_sqr": 1.031,
+      "ratio_ctrl_to_sqr": 0.0646
     },
     "1024": {
-      "sqr_ns": 2905.98,
-      "mult_ns": 3281.23,
-      "ctrl_ns": 73.28,
-      "scan_ns": 26297.67,
-      "ratio_mult_to_sqr": 1.1291,
-      "ratio_ctrl_to_sqr": 0.0252
+      "sqr_ns": 3006.67,
+      "mult_ns": 3659.5,
+      "ctrl_ns": 81.89,
+      "scan_ns": 29662.42,
+      "ratio_mult_to_sqr": 1.2171,
+      "ratio_ctrl_to_sqr": 0.0272
     },
     "2048": {
-      "sqr_ns": 8963.45,
-      "mult_ns": 10990.94,
-      "ctrl_ns": 75.89,
-      "scan_ns": 54194.15,
-      "ratio_mult_to_sqr": 1.2262,
-      "ratio_ctrl_to_sqr": 0.0085
+      "sqr_ns": 10554.88,
+      "mult_ns": 11799.6,
+      "ctrl_ns": 100.17,
+      "scan_ns": 59336.63,
+      "ratio_mult_to_sqr": 1.1179,
+      "ratio_ctrl_to_sqr": 0.0095
     }
   },
   "calibrated_coefficients": {
     "cost_sqr": 1.0,
-    "cost_mult": 1.1367,
-    "cost_ctrl": 0.0209,
+    "cost_mult": 1.1253,
+    "cost_ctrl": 0.022,
     "description": "hw_cost = sqrs*cost_sqr + mults*cost_mult + precomp_mults*cost_mult + iters*cost_ctrl"
   },
   "summary": {
@@ -52,11 +52,11 @@
     },
     "measured_on_this_machine": {
       "cost_sqr": 1.0,
-      "cost_mult": 1.1367,
-      "cost_ctrl": 0.0209,
+      "cost_mult": 1.1253,
+      "cost_ctrl": 0.022,
       "description": "hw_cost = sqrs*cost_sqr + mults*cost_mult + precomp_mults*cost_mult + iters*cost_ctrl"
     },
-    "mult_ratio_change_pct": -5.27,
-    "ctrl_ratio_change_pct": -86.07
+    "mult_ratio_change_pct": -6.22,
+    "ctrl_ratio_change_pct": -85.33
   }
 }

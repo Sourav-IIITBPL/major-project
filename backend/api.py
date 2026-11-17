@@ -1,23 +1,10 @@
 """
-Enhancement 2 – FastAPI REST Backend
-======================================
-Exposes the ML-Assisted Adaptive Cryptographic Engine as a REST API.
-
-Endpoints:
-  GET  /                          Health check + API info
-  POST /api/analyze               Extract features + predict strategy for given exponent
-  POST /api/compute               Run full adaptive modular exponentiation
-  GET  /api/benchmark             Run live 7-strategy benchmark for given bit-length
-  POST /api/rsa/keygen            Generate RSA key pair
-  POST /api/rsa/encrypt           RSA encrypt integer
-  POST /api/rsa/decrypt           RSA decrypt integer
-  POST /api/rsa/sign              RSA sign (text or integer)
-  POST /api/rsa/verify            RSA verify signature
-  GET  /api/backends              List available hardware backend profiles
-  POST /api/backends/dispatch     Dispatch strategy for a specific hardware backend
-
-Run:
-    .venv/bin/uvicorn backend.api:app --reload --port 8000
+FastAPI REST Backend for ML-Assisted Adaptive Cryptographic Engine
+===================================================================
+Production-grade REST API supporting arbitrary-precision cryptography.
+All large integers (1024-bit, 2048-bit, 4096-bit) are safely accepted
+as strings or integers and returned as exact decimal/hex strings to
+prevent IEEE 754 floating-point truncation in browser JavaScript.
 """
 
 import sys
@@ -26,6 +13,7 @@ import math
 import secrets
 import time
 import traceback
+from typing import Optional, Literal, Union, Any
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -33,33 +21,55 @@ sys.path.insert(0, ROOT)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
 
-# Project imports
+# Core project imports
 from major.src.features.feature_extractor import extract_features
 from major.src.adaptive_engine import AdaptiveCryptoEngine
 from major.src.crypto_utils import generate_prime
 from major.src.ml.compiled_predictor import predict_strategy
 from major.src.ml.generate_dataset import generate_custom_exponent, compute_hw_cost
 from crypto_pipeline.rsa_pipeline import RSAPipeline
-from multi_backend.backend_configs import BACKEND_CONFIGS, compute_hw_cost_backend
+from multi_backend.backend_configs import BACKEND_CONFIGS
 from multi_backend.train_per_backend import dispatch_for_backend
 
+
 # ---------------------------------------------------------------------------
-# App setup
+# BigInt Parser (safely parses int, decimal string, or hex 0x... string)
 # ---------------------------------------------------------------------------
+
+def parse_large_int(val: Union[int, str, None], field_name: str = "value") -> int:
+    """Parse large cryptographic integers with arbitrary precision."""
+    if val is None:
+        raise HTTPException(status_code=400, detail=f"Missing required parameter: {field_name}")
+    if isinstance(val, int):
+        return val
+    s = str(val).strip().replace("\n", "").replace(" ", "").replace("_", "")
+    if not s:
+        raise HTTPException(status_code=400, detail=f"Parameter '{field_name}' cannot be empty")
+    try:
+        if s.startswith("0x") or s.startswith("0X"):
+            return int(s, 16)
+        return int(s)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid integer format for '{field_name}'. Must be decimal or 0x-prefixed hex string."
+        )
+
+
+# ---------------------------------------------------------------------------
+# App initialization
+# ---------------------------------------------------------------------------
+
 app = FastAPI(
-    title="ML-Assisted Adaptive Cryptographic Engine API",
-    description=(
-        "REST API for the ML-Assisted Adaptive Cryptographic Engine — "
-        "B.Tech Major Project by Sourav Yadav & Eric Dazzle George, IIIT Bhopal."
-    ),
-    version="1.0.0",
+    title="Adaptive Cryptographic Engine API",
+    description="Workload-Aware Exponentiation & Side-Channel Mitigation Platform",
+    version="2.0.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # Allow React frontend on any port
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,185 +77,192 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Pydantic Models
+# Request Schemas (Using Union[int, str] for BigInt safety)
 # ---------------------------------------------------------------------------
 
 class AnalyzeRequest(BaseModel):
-    exponent: int = Field(..., gt=0, description="Exponent B (positive integer)")
+    exponent: Union[int, str] = Field(..., description="Exponent integer or decimal/hex string")
     w: int = Field(3, ge=2, le=6, description="wNAF window size")
 
 
+class GenerateExponentRequest(BaseModel):
+    bits: int = Field(1024, ge=16, le=8192)
+    profile: Literal["uniform", "sparse", "dense", "bursty", "alternating", "ecc_random"] = "uniform"
+
+
 class ComputeRequest(BaseModel):
-    base: int = Field(..., gt=0)
-    exponent: int = Field(..., gt=0)
-    modulus: int = Field(..., gt=1)
+    base: Union[int, str]
+    exponent: Union[int, str]
+    modulus: Union[int, str]
     mode: Literal[
         "ml_adaptive", "fixed_binary", "fixed_naf",
         "fixed_wnaf", "fixed_vlim", "hybrid_sliced", "blinded_adaptive"
     ] = "ml_adaptive"
-    phi_m: Optional[int] = None
+    phi_m: Optional[Union[int, str]] = None
     slice_bits: int = 256
 
 
 class BenchmarkRequest(BaseModel):
     bit_length: int = Field(1024, ge=128, le=4096)
     profile: Literal["uniform", "sparse", "dense", "bursty", "alternating"] = "uniform"
-    trials: int = Field(3, ge=1, le=10)
+    trials: int = Field(2, ge=1, le=10)
 
 
 class RSAKeygenRequest(BaseModel):
-    bits: int = Field(2048, ge=512, le=4096)
+    bits: int = Field(1024, ge=256, le=4096)
 
 
 class RSAEncryptRequest(BaseModel):
-    message: int = Field(..., gt=0)
-    e: int
-    n: int
+    message: Union[int, str]
+    e: Union[int, str]
+    n: Union[int, str]
 
 
 class RSADecryptRequest(BaseModel):
-    ciphertext: int = Field(..., gt=0)
-    d: int
-    n: int
-    p: int
-    q: int
-    phi_n: int
+    ciphertext: Union[int, str]
+    d: Union[int, str]
+    n: Union[int, str]
+    p: Union[int, str]
+    q: Union[int, str]
+    phi_n: Union[int, str]
 
 
 class RSASignRequest(BaseModel):
-    message: Optional[int] = None
-    text: Optional[str]    = None
-    d: int
-    n: int
-    p: int
-    q: int
-    phi_n: int
+    message: Optional[Union[int, str]] = None
+    text: Optional[str] = None
+    d: Union[int, str]
+    n: Union[int, str]
+    p: Union[int, str]
+    q: Union[int, str]
+    phi_n: Union[int, str]
 
 
 class RSAVerifyRequest(BaseModel):
-    signature: int
-    message: Optional[int] = None
-    text: Optional[str]    = None
-    e: int
-    n: int
+    signature: Union[int, str]
+    message: Optional[Union[int, str]] = None
+    text: Optional[str] = None
+    e: Union[int, str]
+    n: Union[int, str]
 
 
 class BackendDispatchRequest(BaseModel):
-    exponent: int = Field(..., gt=0)
+    exponent: Union[int, str]
     backend: str = "python_bigint"
 
 
 # ---------------------------------------------------------------------------
-# Helper: generate alternating exponent
-# ---------------------------------------------------------------------------
-def _alternating_exp(bit_length: int) -> int:
-    val = 0
-    for i in range(bit_length):
-        if i % 2 == 0:
-            val |= (1 << i)
-    return val
-
-
-# ---------------------------------------------------------------------------
-# Routes
+# Endpoints
 # ---------------------------------------------------------------------------
 
 @app.get("/", tags=["Health"])
-def root():
+def health():
     return {
         "status": "online",
-        "project": "ML-Assisted Adaptive Cryptographic Engine",
-        "authors": ["Sourav Yadav (23U01074)", "Eric Dazzle George (23U01035)"],
-        "institution": "IIIT Bhopal – B.Tech Major Project",
-        "supervisor": "Dr. Aashish Parihar",
-        "version": "1.0.0",
-        "endpoints": [
-            "POST /api/analyze",
-            "POST /api/compute",
-            "GET  /api/benchmark",
-            "POST /api/rsa/keygen",
-            "POST /api/rsa/encrypt",
-            "POST /api/rsa/decrypt",
-            "POST /api/rsa/sign",
-            "POST /api/rsa/verify",
-            "GET  /api/backends",
-            "POST /api/backends/dispatch",
-        ],
+        "service": "Adaptive Cryptographic Engine API",
+        "version": "2.0.0",
+        "supported_backends": list(BACKEND_CONFIGS.keys()),
     }
 
 
-@app.post("/api/analyze", tags=["Dispatch"])
-def analyze(req: AnalyzeRequest):
-    """
-    Extract structural features from an exponent and predict the optimal strategy.
-    Returns the full 10-dimensional feature vector and ML decision.
-    """
+@app.post("/api/generate-exponent", tags=["Core"])
+def generate_exponent_api(req: GenerateExponentRequest):
+    """Generate a random exponent string with specific bit-length and topology."""
     try:
-        feats    = extract_features(req.exponent, w=req.w)
-        strategy = predict_strategy(feats)
-        bit_len  = req.exponent.bit_length()
-
+        from enhanced_dataset.generate_extended_dataset import PROFILE_GENERATORS
+        if req.profile in PROFILE_GENERATORS:
+            exp = PROFILE_GENERATORS[req.profile](req.bits)
+        else:
+            exp = secrets.randbits(req.bits) | (1 << (req.bits - 1)) | 1
+        
         return {
-            "exponent_bits": bit_len,
-            "features": feats,
-            "predicted_strategy": strategy,
-            "strategy_rationale": _strategy_rationale(feats, strategy),
+            "exponent": str(exp),
+            "hex": hex(exp),
+            "bits": exp.bit_length(),
+            "profile": req.profile,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/compute", tags=["Dispatch"])
-def compute(req: ComputeRequest):
-    """
-    Execute modular exponentiation: result = base^exponent mod modulus.
-    Uses the specified dispatch mode.
-    """
-    if math.gcd(req.base, req.modulus) != 1:
-        raise HTTPException(
-            status_code=400,
-            detail="gcd(base, modulus) != 1. base and modulus must be coprime."
-        )
+@app.post("/api/analyze", tags=["Core"])
+def analyze_exponent(req: AnalyzeRequest):
+    """Extract structural features from an exponent and predict optimal strategy."""
     try:
-        t0  = time.perf_counter()
+        exp_int = parse_large_int(req.exponent, "exponent")
+        if exp_int <= 0:
+            raise HTTPException(status_code=400, detail="Exponent must be positive.")
+        
+        t0 = time.perf_counter_ns()
+        feats = extract_features(exp_int, w=req.w)
+        strategy = predict_strategy(feats)
+        extract_time_us = (time.perf_counter_ns() - t0) / 1000.0
+
+        return {
+            "exponent_bits": feats["bit_length"],
+            "features": feats,
+            "predicted_strategy": strategy,
+            "strategy_rationale": _generate_rationale(feats, strategy),
+            "extract_time_us": round(extract_time_us, 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Feature extraction failed: {str(e)}")
+
+
+@app.post("/api/compute", tags=["Core"])
+def compute_modular_exponentiation(req: ComputeRequest):
+    """Execute A^B mod M using the chosen dispatch strategy."""
+    try:
+        base = parse_large_int(req.base, "base")
+        exp = parse_large_int(req.exponent, "exponent")
+        mod = parse_large_int(req.modulus, "modulus")
+        phi = parse_large_int(req.phi_m, "phi_m") if req.phi_m is not None else None
+
+        if mod <= 1:
+            raise HTTPException(status_code=400, detail="Modulus must be > 1.")
+        if math.gcd(base, mod) != 1:
+            raise HTTPException(status_code=400, detail="gcd(base, modulus) != 1. Base must be coprime to modulus.")
+
+        t0 = time.perf_counter()
         res = AdaptiveCryptoEngine.execute(
-            base=req.base, exp=req.exponent, mod=req.modulus,
-            mode=req.mode, phi_m=req.phi_m, slice_bits=req.slice_bits,
+            base=base, exp=exp, mod=mod,
+            mode=req.mode, phi_m=phi, slice_bits=req.slice_bits
         )
-        total_ms = (time.perf_counter() - t0) * 1000
+        total_ms = (time.perf_counter() - t0) * 1000.0
 
         m = res["metrics"]
         return {
-            "result":            res["result"],
-            "mode":              req.mode,
-            "strategy_used":     res["selected_strategy"],
-            "total_time_ms":     round(total_ms, 4),
-            "dispatch_time_us":  round(res["dispatch_time_us"], 4),
+            "result": str(res["result"]),
+            "hex": hex(res["result"]),
+            "mode": req.mode,
+            "strategy_used": res["selected_strategy"],
+            "total_time_ms": round(total_ms, 3),
+            "dispatch_time_us": round(res["dispatch_time_us"], 3),
             "metrics": {
-                "squarings":     m["sqrs"],
+                "squarings": m["sqrs"],
                 "multiplications": m["mults"],
-                "iterations":    m["iters"],
-                "hw_cost":       round(compute_hw_cost(m), 2),
-            },
+                "iterations": m["iters"],
+                "hw_cost": round(compute_hw_cost(m), 2),
+            }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Computation failed: {str(e)}")
 
 
 @app.post("/api/benchmark", tags=["Benchmark"])
-def benchmark(req: BenchmarkRequest):
-    """
-    Run a live multi-strategy benchmark for the specified bit-length and profile.
-    Returns timing, multiplications, and speedup for all 7 strategies.
-    """
+def run_benchmark(req: BenchmarkRequest):
+    """Execute live multi-strategy comparative benchmark across true RSA primes."""
     try:
         p = generate_prime(req.bit_length // 2)
         q = generate_prime(req.bit_length // 2)
         while q == p:
             q = generate_prime(req.bit_length // 2)
-        mod   = p * q
+        mod = p * q
         phi_m = (p - 1) * (q - 1)
-        base  = secrets.randbits(req.bit_length) % mod
+        base = secrets.randbits(req.bit_length) % mod
         while math.gcd(base, mod) != 1:
             base = secrets.randbits(req.bit_length) % mod
 
@@ -255,9 +272,12 @@ def benchmark(req: BenchmarkRequest):
         ]
         agg = {m: {"time_ms": 0.0, "mults": 0, "iters": 0, "hw_cost": 0.0} for m in modes}
 
-        # Profile-specific exponent generator
         if req.profile == "alternating":
-            exp_fn = lambda: _alternating_exp(req.bit_length)
+            exp_val = 0
+            for i in range(req.bit_length):
+                if i % 2 == 0:
+                    exp_val |= (1 << i)
+            exp_fn = lambda: exp_val
         else:
             exp_fn = lambda: generate_custom_exponent(req.bit_length, req.profile)
 
@@ -271,138 +291,199 @@ def benchmark(req: BenchmarkRequest):
                 assert res["result"] == expected
                 m = res["metrics"]
                 agg[mode]["time_ms"] += res["total_time_ms"]
-                agg[mode]["mults"]   += m["mults"]
-                agg[mode]["iters"]   += m["iters"]
+                agg[mode]["mults"] += m["mults"]
+                agg[mode]["iters"] += m["iters"]
                 agg[mode]["hw_cost"] += compute_hw_cost(m)
 
-        # Average
+        base_time = (agg["fixed_binary"]["time_ms"] / req.trials) or 1.0
+        base_mults = (agg["fixed_binary"]["mults"] / req.trials) or 1.0
         results = []
-        base_time = agg["fixed_binary"]["time_ms"] / req.trials
-        base_mults = agg["fixed_binary"]["mults"] / req.trials
+
         for mode in modes:
-            avg_t = agg[mode]["time_ms"]   / req.trials
-            avg_m = agg[mode]["mults"]     / req.trials
-            avg_i = agg[mode]["iters"]     / req.trials
-            avg_h = agg[mode]["hw_cost"]   / req.trials
+            avg_t = agg[mode]["time_ms"] / req.trials
+            avg_m = agg[mode]["mults"] / req.trials
+            avg_i = agg[mode]["iters"] / req.trials
+            avg_h = agg[mode]["hw_cost"] / req.trials
             results.append({
-                "mode":           mode,
-                "avg_time_ms":    round(avg_t, 3),
-                "avg_mults":      round(avg_m, 1),
-                "avg_iters":      round(avg_i, 1),
-                "avg_hw_cost":    round(avg_h, 1),
-                "speedup_pct":    round((base_time - avg_t) / base_time * 100, 2),
-                "mult_cut_pct":   round((base_mults - avg_m) / base_mults * 100, 2),
+                "mode": mode,
+                "avg_time_ms": round(avg_t, 3),
+                "avg_mults": round(avg_m, 1),
+                "avg_iters": round(avg_i, 1),
+                "avg_hw_cost": round(avg_h, 1),
+                "speedup_pct": round((base_time - avg_t) / base_time * 100.0, 1),
+                "mult_cut_pct": round((base_mults - avg_m) / base_mults * 100.0, 1),
             })
 
         return {
             "bit_length": req.bit_length,
-            "profile":    req.profile,
-            "trials":     req.trials,
-            "results":    results,
+            "profile": req.profile,
+            "trials": req.trials,
+            "results": results,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# ------------------------------------------------------------------
-# RSA Pipeline Endpoints
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# RSA Lifecycle Endpoints (Strings for BigInt exactness)
+# ---------------------------------------------------------------------------
 
-@app.post("/api/rsa/keygen", tags=["RSA Pipeline"])
+@app.post("/api/rsa/keygen", tags=["RSA"])
 def rsa_keygen(req: RSAKeygenRequest):
-    """Generate a fresh RSA key pair."""
+    """Generate RSA key pair and return components as exact strings."""
     try:
         pair = RSAPipeline.keygen(bits=req.bits)
-        pub  = pair.public
+        pub = pair.public
         priv = pair.private
         return {
-            "bits":  req.bits,
-            "public_key":  {"e": pub.e, "n": pub.n},
-            "private_key": {
-                "d":     priv.d, "n": priv.n,
-                "p":     priv.p, "q": priv.q,
-                "phi_n": priv.phi_n,
+            "bits": req.bits,
+            "public_key": {
+                "e": str(pub.e),
+                "n": str(pub.n),
+                "n_hex": hex(pub.n),
             },
-            "note": "Keep private_key confidential. Share only public_key.",
+            "private_key": {
+                "d": str(priv.d),
+                "d_hex": hex(priv.d),
+                "n": str(priv.n),
+                "p": str(priv.p),
+                "q": str(priv.q),
+                "phi_n": str(priv.phi_n),
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/rsa/encrypt", tags=["RSA Pipeline"])
+@app.post("/api/rsa/encrypt", tags=["RSA"])
 def rsa_encrypt(req: RSAEncryptRequest):
-    """Encrypt an integer with the public key using ML-Adaptive dispatch."""
+    """Encrypt message with public key using ML-Adaptive dispatch."""
     from crypto_pipeline.rsa_pipeline import RSAPublicKey
     try:
-        pub = RSAPublicKey(e=req.e, n=req.n)
-        res = RSAPipeline.encrypt(req.message, pub)
-        return res
+        msg = parse_large_int(req.message, "message")
+        e = parse_large_int(req.e, "e")
+        n = parse_large_int(req.n, "n")
+        pub = RSAPublicKey(e=e, n=n)
+        res = RSAPipeline.encrypt(msg, pub)
+        return {
+            "ciphertext": str(res["ciphertext"]),
+            "ciphertext_hex": hex(res["ciphertext"]),
+            "strategy_used": res["strategy_used"],
+            "total_time_ms": round(res["total_time_ms"], 3),
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/rsa/decrypt", tags=["RSA Pipeline"])
+@app.post("/api/rsa/decrypt", tags=["RSA"])
 def rsa_decrypt(req: RSADecryptRequest):
-    """Decrypt a ciphertext with the private key using Blinded-Adaptive dispatch."""
+    """Decrypt ciphertext with private key using Blinded-Adaptive dispatch."""
     from crypto_pipeline.rsa_pipeline import RSAPrivateKey
     try:
-        priv = RSAPrivateKey(d=req.d, n=req.n, p=req.p, q=req.q, phi_n=req.phi_n)
-        res  = RSAPipeline.decrypt(req.ciphertext, priv)
-        return res
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/rsa/sign", tags=["RSA Pipeline"])
-def rsa_sign(req: RSASignRequest):
-    """Sign a message (integer or text) with the private key."""
-    from crypto_pipeline.rsa_pipeline import RSAPrivateKey
-    try:
-        priv = RSAPrivateKey(d=req.d, n=req.n, p=req.p, q=req.q, phi_n=req.phi_n)
-        if req.text is not None:
-            return RSAPipeline.sign_text(req.text, priv)
-        elif req.message is not None:
-            return RSAPipeline.sign(req.message, priv)
-        else:
-            raise HTTPException(status_code=400, detail="Provide 'message' or 'text'.")
+        ct = parse_large_int(req.ciphertext, "ciphertext")
+        d = parse_large_int(req.d, "d")
+        n = parse_large_int(req.n, "n")
+        p = parse_large_int(req.p, "p")
+        q = parse_large_int(req.q, "q")
+        phi = parse_large_int(req.phi_n, "phi_n")
+        priv = RSAPrivateKey(d=d, n=n, p=p, q=q, phi_n=phi)
+        res = RSAPipeline.decrypt(ct, priv)
+        return {
+            "plaintext": str(res["plaintext"]),
+            "plaintext_hex": hex(res["plaintext"]),
+            "strategy_used": res["strategy_used"],
+            "total_time_ms": round(res["total_time_ms"], 3),
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/rsa/verify", tags=["RSA Pipeline"])
+@app.post("/api/rsa/sign", tags=["RSA"])
+def rsa_sign(req: RSASignRequest):
+    """Sign message digest with private key using Blinded-Adaptive dispatch."""
+    from crypto_pipeline.rsa_pipeline import RSAPrivateKey
+    try:
+        d = parse_large_int(req.d, "d")
+        n = parse_large_int(req.n, "n")
+        p = parse_large_int(req.p, "p")
+        q = parse_large_int(req.q, "q")
+        phi = parse_large_int(req.phi_n, "phi_n")
+        priv = RSAPrivateKey(d=d, n=n, p=p, q=q, phi_n=phi)
+
+        if req.text is not None:
+            res = RSAPipeline.sign_text(req.text, priv)
+            return {
+                "signature": str(res["signature"]),
+                "signature_hex": hex(res["signature"]),
+                "message_hash_int": str(res.get("message_hash_int", "")),
+                "strategy_used": res["strategy_used"],
+                "total_time_ms": round(res["total_time_ms"], 3),
+            }
+        elif req.message is not None:
+            msg = parse_large_int(req.message, "message")
+            res = RSAPipeline.sign(msg, priv)
+            return {
+                "signature": str(res["signature"]),
+                "signature_hex": hex(res["signature"]),
+                "strategy_used": res["strategy_used"],
+                "total_time_ms": round(res["total_time_ms"], 3),
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Provide 'text' or 'message'.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/rsa/verify", tags=["RSA"])
 def rsa_verify(req: RSAVerifyRequest):
-    """Verify a signature against a message or text."""
+    """Verify signature with public key using ML-Adaptive dispatch."""
     from crypto_pipeline.rsa_pipeline import RSAPublicKey
     try:
-        pub = RSAPublicKey(e=req.e, n=req.n)
+        sig = parse_large_int(req.signature, "signature")
+        e = parse_large_int(req.e, "e")
+        n = parse_large_int(req.n, "n")
+        pub = RSAPublicKey(e=e, n=n)
+
         if req.text is not None:
-            return RSAPipeline.verify_text(req.text, req.signature, pub)
+            res = RSAPipeline.verify_text(req.text, sig, pub)
         elif req.message is not None:
-            return RSAPipeline.verify(req.signature, req.message, pub)
+            msg = parse_large_int(req.message, "message")
+            res = RSAPipeline.verify(sig, msg, pub)
         else:
-            raise HTTPException(status_code=400, detail="Provide 'message' or 'text'.")
+            raise HTTPException(status_code=400, detail="Provide 'text' or 'message'.")
+
+        return {
+            "verified": res["verified"],
+            "recovered": str(res.get("recovered", "")),
+            "strategy_used": res["strategy_used"],
+            "total_time_ms": round(res["total_time_ms"], 3),
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ------------------------------------------------------------------
-# Backend Endpoints
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Hardware Backend Endpoints
+# ---------------------------------------------------------------------------
 
-@app.get("/api/backends", tags=["Multi-Backend"])
-def get_backends():
-    """List all available hardware backend profiles."""
+@app.get("/api/backends", tags=["Hardware"])
+def get_hardware_backends():
+    """List hardware target profiles and cost ratios."""
     return {
         "backends": [
             {
-                "name":        name,
-                "cost_sqr":    cfg["cost_sqr"],
-                "cost_mult":   cfg["cost_mult"],
-                "cost_ctrl":   cfg["cost_ctrl"],
+                "name": name,
+                "cost_sqr": cfg["cost_sqr"],
+                "cost_mult": cfg["cost_mult"],
+                "cost_ctrl": cfg["cost_ctrl"],
                 "description": cfg["description"],
             }
             for name, cfg in BACKEND_CONFIGS.items()
@@ -410,64 +491,48 @@ def get_backends():
     }
 
 
-@app.post("/api/backends/dispatch", tags=["Multi-Backend"])
-def backend_dispatch(req: BackendDispatchRequest):
-    """
-    Predict the optimal strategy for a specific hardware backend.
-    Uses the backend-specific trained model if available,
-    else falls back to the default compiled predictor.
-    """
+@app.post("/api/backends/dispatch", tags=["Hardware"])
+def dispatch_backend(req: BackendDispatchRequest):
+    """Predict strategy for specific hardware backend target."""
     try:
-        feats    = extract_features(req.exponent, w=3)
+        exp_int = parse_large_int(req.exponent, "exponent")
+        feats = extract_features(exp_int, w=3)
         strategy = dispatch_for_backend(feats, req.backend)
-        cfg      = BACKEND_CONFIGS.get(req.backend, {})
+        cfg = BACKEND_CONFIGS.get(req.backend, {})
+
         return {
-            "exponent_bits":     req.exponent.bit_length(),
-            "backend":           req.backend,
+            "exponent_bits": exp_int.bit_length(),
+            "backend": req.backend,
             "predicted_strategy": strategy,
             "backend_costs": {
-                "cost_sqr":  cfg.get("cost_sqr", 1.0),
+                "cost_sqr": cfg.get("cost_sqr", 1.0),
                 "cost_mult": cfg.get("cost_mult", 1.2),
                 "cost_ctrl": cfg.get("cost_ctrl", 0.15),
             },
             "features": feats,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
-# Internal helper
+# Helper Rationale
 # ---------------------------------------------------------------------------
-def _strategy_rationale(feats: dict, strategy: str) -> str:
-    """Generate a human-readable explanation for the ML dispatch decision."""
-    longest_one  = feats.get("longest_one_run", 0)
-    hw           = feats.get("hamming_weight", 0)
-    zero_density = feats.get("zero_density", 0)
-    bit_length   = feats.get("bit_length", 0)
+
+def _generate_rationale(feats: dict, strategy: str) -> str:
+    hw = feats.get("hamming_weight", 0)
+    bits = feats.get("bit_length", 0)
+    l_one = feats.get("longest_one_run", 0)
+    zero_density = feats.get("zero_density", 0.0)
 
     if strategy == "Binary":
-        return (
-            f"Binary selected: Hamming weight is low ({hw}) or exponent is "
-            f"short ({bit_length}-bit). Precomputation table cost of wNAF "
-            f"would exceed its multiplication savings."
-        )
-    elif strategy == "NAF":
-        return (
-            f"NAF selected: Long 1-runs detected (max={longest_one}). "
-            f"NAF collapses 1-runs from {longest_one} multiplications down to 2 "
-            f"(2^k−1 trick). Precomputation overhead is minimal."
-        )
+        return f"Binary L-to-R selected: Exponent has low Hamming density ({hw}/{bits}) or low bit-length ({bits}-bit). Avoiding window table precomputation overhead yields optimal execution."
     elif strategy == "wNAF":
-        return (
-            f"wNAF (w=3) selected: High Hamming weight ({hw}) and long 1-runs "
-            f"({longest_one}) make window precomputation profitable. Expected "
-            f"multiplication density: ~25% of bit-length."
-        )
+        return f"Windowed NAF (w=3) selected: High density ({hw} ones) and bit streaks (longest one run = {l_one}) justify table precomputations. Multiplications reduced by up to 75-90%."
+    elif strategy == "NAF":
+        return f"Standard NAF selected: Long one-runs ({l_one} bits) are collapsed via signed recoding (2^k - 1) with negligible precomputation penalty."
     elif strategy == "VLIM":
-        return (
-            f"VLIM selected: High zero density ({zero_density:.2%}) allows "
-            f"aggressive zero-run batching. Control loop iterations reduced "
-            f"by an estimated 50–87% vs Binary."
-        )
-    return "Strategy selected via compiled Decision Tree classifier."
+        return f"Adaptive VLIM selected: High zero density ({zero_density:.1%}) enables aggressive zero-run batch squarings, compressing loop cycles by 50-87%."
+    return "Optimized routing via compiled Decision Tree graph."

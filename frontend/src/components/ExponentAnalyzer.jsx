@@ -2,216 +2,384 @@ import React, { useState } from 'react'
 import axios from 'axios'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 
-const card = {
-  background: 'rgba(26,31,46,0.8)',
-  border: '1px solid #2d3748',
-  borderRadius: '12px',
-  padding: '24px',
-  marginBottom: '20px',
-}
-const label = { fontSize: '13px', color: '#a0aec0', marginBottom: '6px', fontWeight: 600 }
-const input = {
-  width: '100%', background: '#0f1117', border: '1px solid #2d3748',
-  borderRadius: '8px', padding: '10px 14px', color: '#e2e8f0',
-  fontSize: '13px', outline: 'none', fontFamily: 'monospace',
-}
-const btn = (color = '#2563eb') => ({
-  background: `linear-gradient(90deg, ${color}, #7c3aed)`,
-  color: 'white', border: 'none', borderRadius: '8px',
-  padding: '10px 24px', cursor: 'pointer', fontWeight: 700,
-  fontSize: '14px', marginTop: '12px',
-})
-const badge = (color) => ({
-  display: 'inline-block', padding: '4px 12px', borderRadius: '20px',
-  background: color, color: 'white', fontWeight: 700, fontSize: '13px',
-})
-
-const STRATEGY_COLORS = {
-  Binary: '#e74c3c', NAF: '#e67e22', wNAF: '#3498db', VLIM: '#9b59b6'
-}
-
-const FEATURE_LABELS = {
-  bit_length: 'Bit Length', hamming_weight: 'Hamming Weight',
-  zero_density: 'Zero Density', longest_zero_run: 'Max Zero Run',
-  avg_zero_run: 'Avg Zero Run', longest_one_run: 'Max One Run',
-  trailing_zeros: 'Trailing Zeros', wnaf_weight: 'wNAF Weight',
-  wnaf_zero_density: 'wNAF Zero Density', longest_wnaf_zero_run: 'Max wNAF Zero Run',
+const STRATEGY_BADGES = {
+  Binary: { bg: '#dc2626', text: '#fee2e2' },
+  NAF:    { bg: '#d97706', text: '#fef3c7' },
+  wNAF:   { bg: '#2563eb', text: '#dbeafe' },
+  VLIM:   { bg: '#7c3aed', text: '#ede9fe' },
 }
 
 export default function ExponentAnalyzer() {
   const [expInput, setExpInput] = useState('')
-  const [bitLen,   setBitLen]   = useState('1024')
-  const [mode,     setMode]     = useState('random')
-  const [result,   setResult]   = useState(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
+  const [bitLen, setBitLen] = useState('1024')
+  const [profile, setProfile] = useState('uniform')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [genLoading, setGenLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
-  const generateRandom = () => {
-    // Generate a random number by picking random hex digits
-    const bytes = Math.ceil(parseInt(bitLen) / 4)
-    let hex = ''
-    const chars = '0123456789abcdef'
-    for (let i = 0; i < bytes; i++) hex += chars[Math.floor(Math.random() * 16)]
-    // Ensure MSB is set
-    hex = '8' + hex.slice(1)
-    const bigNum = BigInt('0x' + hex)
-    setExpInput(bigNum.toString())
+  // Generate random exponent via backend API (keeps exact string precision)
+  const handleGenerate = async () => {
+    setGenLoading(true)
+    setError('')
+    try {
+      const res = await axios.post('/api/generate-exponent', {
+        bits: parseInt(bitLen, 10),
+        profile: profile,
+      })
+      setExpInput(res.data.exponent)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to generate exponent.')
+    } finally {
+      setGenLoading(false)
+    }
   }
 
-  const analyze = async () => {
-    if (!expInput.trim()) { setError('Enter an exponent value.'); return }
-    setError(''); setLoading(true); setResult(null)
+  // Analyze the exponent using string value
+  const handleAnalyze = async () => {
+    const trimmed = expInput.trim()
+    if (!trimmed) {
+      setError('Please provide an exponent value or generate one.')
+      return
+    }
+    setLoading(true)
+    setError('')
     try {
-      const { data } = await axios.post('/api/analyze', {
-        exponent: parseInt(expInput), w: 3
+      const res = await axios.post('/api/analyze', {
+        exponent: trimmed,
+        w: 3,
       })
-      setResult(data)
-    } catch (e) {
-      setError(e.response?.data?.detail || e.message)
+      setResult(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Analysis request failed.')
     } finally {
       setLoading(false)
     }
   }
 
-  const radarData = result
-    ? Object.entries(FEATURE_LABELS).map(([key, label]) => {
-        const val = result.features[key] || 0
-        // Normalize 0-100 for radar
-        const max = key === 'bit_length' ? 4096
-          : key.includes('density') ? 1
-          : key.includes('weight') ? result.features.bit_length || 1
-          : result.features.bit_length || 1
-        return { feature: label, value: Math.min(100, (val / max) * 100), raw: val }
-      })
-    : []
+  const handleCopy = () => {
+    if (!expInput) return
+    navigator.clipboard.writeText(expInput)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  // Radar metrics normalization (0 - 100)
+  const radarData = result ? [
+    { metric: 'Hamming Weight', value: Math.min(100, (result.features.hamming_weight / (result.features.bit_length || 1)) * 100), raw: result.features.hamming_weight },
+    { metric: 'Zero Density', value: (result.features.zero_density || 0) * 100, raw: `${((result.features.zero_density || 0) * 100).toFixed(1)}%` },
+    { metric: 'Max 1-Run', value: Math.min(100, ((result.features.longest_one_run || 0) / 64) * 100), raw: result.features.longest_one_run },
+    { metric: 'Max 0-Run', value: Math.min(100, ((result.features.longest_zero_run || 0) / 64) * 100), raw: result.features.longest_zero_run },
+    { metric: 'wNAF Weight', value: Math.min(100, (result.features.wnaf_weight / (result.features.bit_length || 1)) * 100), raw: result.features.wnaf_weight },
+    { metric: 'wNAF 0-Density', value: (result.features.wnaf_zero_density || 0) * 100, raw: `${((result.features.wnaf_zero_density || 0) * 100).toFixed(1)}%` },
+  ] : []
 
   return (
-    <div>
-      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px' }}>
-        🔍 Exponent Feature Analyzer & ML Dispatcher
-      </h2>
-
-      {/* Input Card */}
-      <div style={card}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '16px', alignItems: 'end' }}>
-          <div>
-            <div style={label}>Exponent Value (integer)</div>
-            <textarea
-              style={{ ...input, height: '80px', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' }}
-              value={expInput}
-              onChange={e => setExpInput(e.target.value)}
-              placeholder="Enter a large integer (or click Generate Random)…"
-            />
-          </div>
-          <div>
-            <div style={label}>Bit Length (for random)</div>
-            <select
-              style={input}
-              value={bitLen}
-              onChange={e => setBitLen(e.target.value)}
-            >
-              {['256','512','1024','2048','4096'].map(b => (
-                <option key={b} value={b}>{b}-bit</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-          <button style={btn('#2563eb')} onClick={analyze} disabled={loading}>
-            {loading ? '⏳ Analyzing…' : '🚀 Analyze & Dispatch'}
-          </button>
-          <button style={{ ...btn('#059669'), marginTop: 0 }} onClick={generateRandom}>
-            🎲 Generate Random {bitLen}-bit
-          </button>
-        </div>
-        {error && <div style={{ color: '#fc8181', marginTop: '10px', fontSize: '13px' }}>{error}</div>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Title & Description */}
+      <div>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+          Exponent Morphology Analyzer
+        </h1>
+        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+          Extracts single-pass bitwise structural features and determines optimal modular exponentiation routing.
+        </p>
       </div>
 
-      {/* Results */}
+      {/* Input Card */}
+      <div style={{
+        backgroundColor: '#0f1422',
+        border: '1px solid #1e2638',
+        borderRadius: '10px',
+        padding: '20px',
+      }}>
+        {/* Controls Bar */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '12px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '14px',
+        }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>Scale:</span>
+            <select
+              value={bitLen}
+              onChange={e => setBitLen(e.target.value)}
+              style={{
+                backgroundColor: '#161d2e',
+                border: '1px solid #273349',
+                color: '#e2e8f0',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            >
+              <option value="256">256-bit</option>
+              <option value="512">512-bit</option>
+              <option value="1024">1024-bit (Standard RSA)</option>
+              <option value="2048">2048-bit (High Security)</option>
+              <option value="4096">4096-bit (Long Term)</option>
+            </select>
+
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginLeft: '6px' }}>Topology:</span>
+            <select
+              value={profile}
+              onChange={e => setProfile(e.target.value)}
+              style={{
+                backgroundColor: '#161d2e',
+                border: '1px solid #273349',
+                color: '#e2e8f0',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            >
+              <option value="uniform">Uniform Random (NIST Default)</option>
+              <option value="dense">Dense Key (&gt;85% Ones)</option>
+              <option value="sparse">Sparse Key (&lt;15% Ones)</option>
+              <option value="bursty">Bursty (Clustered Zero Runs)</option>
+              <option value="alternating">Alternating (101010...)</option>
+              <option value="ecc_random">ECC Scalar Equivalent</option>
+            </select>
+
+            <button
+              onClick={handleGenerate}
+              disabled={genLoading}
+              style={{
+                backgroundColor: '#1e293b',
+                color: '#38bdf8',
+                border: '1px solid #334155',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {genLoading ? 'Generating...' : 'Generate Key'}
+            </button>
+          </div>
+
+          {expInput && (
+            <button
+              onClick={handleCopy}
+              style={{
+                backgroundColor: '#161d2e',
+                color: copied ? '#10b981' : '#94a3b8',
+                border: '1px solid #273349',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {copied ? 'Copied' : 'Copy Exponent'}
+            </button>
+          )}
+        </div>
+
+        {/* Text Area */}
+        <textarea
+          value={expInput}
+          onChange={e => setExpInput(e.target.value)}
+          placeholder="Paste or generate an exponent integer (decimal or 0x-hex format)..."
+          rows={3}
+          style={{
+            width: '100%',
+            backgroundColor: '#090d16',
+            border: '1px solid #1e2638',
+            borderRadius: '6px',
+            color: '#f8fafc',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '12px',
+            padding: '12px',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            outline: 'none',
+          }}
+        />
+
+        {/* Action Button */}
+        <div style={{ marginTop: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            onClick={handleAnalyze}
+            disabled={loading}
+            style={{
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              padding: '8px 20px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            {loading ? 'Extracting Features...' : 'Analyze Exponent'}
+          </button>
+
+          {error && (
+            <span style={{ fontSize: '13px', color: '#ef4444' }}>
+              {error}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Analysis Result Display */}
       {result && (
-        <>
-          {/* Strategy Decision */}
-          <div style={{ ...card, borderColor: '#2d3748', background: 'rgba(37,99,235,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-              <div>
-                <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px' }}>ML PREDICTED STRATEGY</div>
-                <div style={badge(STRATEGY_COLORS[result.predicted_strategy] || '#4a5568')}>
-                  {result.predicted_strategy}
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Dispatch Banner */}
+          <div style={{
+            backgroundColor: '#0f1422',
+            border: '1px solid #1e2638',
+            borderRadius: '10px',
+            padding: '20px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '16px',
+          }}>
+            <div>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, letterSpacing: '0.5px' }}>
+                Predicted Optimal Strategy
               </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px' }}>EXPONENT SIZE</div>
-                <div style={{ fontWeight: 700, fontSize: '18px', color: '#60a5fa' }}>
-                  {result.exponent_bits}-bit
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
+                <span style={{
+                  backgroundColor: STRATEGY_BADGES[result.predicted_strategy]?.bg || '#334155',
+                  color: STRATEGY_BADGES[result.predicted_strategy]?.text || '#ffffff',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  padding: '4px 14px',
+                  borderRadius: '6px',
+                  letterSpacing: '0.3px',
+                }}>
+                  {result.predicted_strategy}
+                </span>
+                <span style={{ fontSize: '14px', color: '#cbd5e1', fontWeight: 500 }}>
+                  for {result.exponent_bits}-bit Key
+                </span>
               </div>
             </div>
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#a0aec0', lineHeight: 1.6 }}>
-              💡 <strong style={{ color: '#e2e8f0' }}>Rationale:</strong> {result.strategy_rationale}
+
+            <div style={{
+              flex: 1,
+              maxWidth: '700px',
+              fontSize: '13px',
+              color: '#94a3b8',
+              lineHeight: '1.5',
+              borderLeft: '2px solid #273349',
+              paddingLeft: '16px',
+            }}>
+              <strong style={{ color: '#e2e8f0' }}>Dispatch Rationale:</strong> {result.strategy_rationale}
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
+                Extraction Latency
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: '#38bdf8', marginTop: '2px' }}>
+                {result.extract_time_us} µs
+              </div>
             </div>
           </div>
 
-          {/* Features Table + Radar */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            {/* Table */}
-            <div style={card}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: '#a78bfa' }}>
-                📐 10-Dimensional Feature Vector
-              </h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', color: '#718096', padding: '6px 0', borderBottom: '1px solid #2d3748' }}>Feature</th>
-                    <th style={{ textAlign: 'right', color: '#718096', padding: '6px 0', borderBottom: '1px solid #2d3748' }}>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(FEATURE_LABELS).map(([key, lbl]) => (
-                    <tr key={key}>
-                      <td style={{ padding: '6px 0', color: '#a0aec0', borderBottom: '1px solid #1e2535' }}>{lbl}</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600,
-                        color: key === 'longest_one_run' ? '#fbbf24' : '#e2e8f0',
-                        borderBottom: '1px solid #1e2535' }}>
-                        {typeof result.features[key] === 'number'
-                          ? result.features[key] % 1 !== 0
-                            ? result.features[key].toFixed(4)
-                            : result.features[key]
-                          : '—'}
-                        {key === 'longest_one_run' && ' ⭐'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ marginTop: '10px', fontSize: '11px', color: '#4a5568' }}>
-                ⭐ longest_one_run: 66.4% feature importance (Decision Tree primary split)
+          {/* Metrics Grid + Radar */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '20px',
+          }}>
+            {/* Structural Metrics Table */}
+            <div style={{
+              backgroundColor: '#0f1422',
+              border: '1px solid #1e2638',
+              borderRadius: '10px',
+              padding: '20px',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '14px' }}>
+                10-Dimensional Feature Fingerprint
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {[
+                  { label: 'Bit Length', val: result.features.bit_length, highlight: false },
+                  { label: 'Hamming Weight', val: `${result.features.hamming_weight} bits`, highlight: false },
+                  { label: 'Zero Density', val: `${(result.features.zero_density * 100).toFixed(2)}%`, highlight: false },
+                  { label: 'Longest One Run (Highest ML Signal)', val: `${result.features.longest_one_run} bits`, highlight: true },
+                  { label: 'Longest Zero Run', val: `${result.features.longest_zero_run} bits`, highlight: false },
+                  { label: 'Average Zero Run', val: `${result.features.avg_zero_run.toFixed(2)} bits`, highlight: false },
+                  { label: 'Trailing Zeros', val: `${result.features.trailing_zeros} bits`, highlight: false },
+                  { label: 'wNAF Weight (Non-Zero Digits)', val: `${result.features.wnaf_weight}`, highlight: false },
+                  { label: 'wNAF Zero Density', val: `${(result.features.wnaf_zero_density * 100).toFixed(2)}%`, highlight: false },
+                  { label: 'Longest wNAF Zero Run', val: `${result.features.longest_wnaf_zero_run} bits`, highlight: false },
+                ].map((item, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: item.highlight ? 'rgba(37,99,235,0.1)' : idx % 2 === 0 ? '#0b0f19' : 'transparent',
+                    border: item.highlight ? '1px solid rgba(56,189,248,0.3)' : 'none',
+                    fontSize: '13px',
+                  }}>
+                    <span style={{ color: item.highlight ? '#38bdf8' : '#94a3b8', fontWeight: item.highlight ? 600 : 400 }}>
+                      {item.label}
+                    </span>
+                    <span style={{
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                      color: item.highlight ? '#f8fafc' : '#e2e8f0',
+                      fontWeight: 600,
+                    }}>
+                      {item.val}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Radar Chart */}
-            <div style={card}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: '#a78bfa' }}>
-                📡 Feature Radar (Normalized 0–100)
-              </h3>
-              <ResponsiveContainer width="100%" height={320}>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="#2d3748" />
-                  <PolarAngleAxis dataKey="feature" tick={{ fill: '#718096', fontSize: 10 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#4a5568', fontSize: 9 }} />
-                  <Radar
-                    dataKey="value" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.3}
-                  />
-                  <Tooltip
-                    formatter={(val, _, props) => [
-                      `${val.toFixed(1)} (raw: ${props.payload.raw})`, 'Normalized Value'
-                    ]}
-                    contentStyle={{ background: '#1a1f2e', border: '1px solid #2d3748', borderRadius: '8px', color: '#e2e8f0' }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+            <div style={{
+              backgroundColor: '#0f1422',
+              border: '1px solid #1e2638',
+              borderRadius: '10px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
+                Morphology Radar Graph
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                Normalized topology profile driving Decision Tree splits.
+              </div>
+
+              <div style={{ flex: 1, minHeight: '300px' }}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart data={radarData}>
+                    <PolarGrid stroke="#273349" />
+                    <PolarAngleAxis dataKey="metric" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <PolarRadiusAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 10 }} />
+                    <Radar dataKey="value" stroke="#38bdf8" fill="#0284c7" fillOpacity={0.25} />
+                    <Tooltip
+                      formatter={(val, name, entry) => [entry.payload.raw, 'Measurement']}
+                      contentStyle={{ backgroundColor: '#0f1422', borderColor: '#273349', borderRadius: '6px', fontSize: '12px', color: '#f8fafc' }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

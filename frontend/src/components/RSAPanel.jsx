@@ -1,205 +1,401 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 
-const card = {
-  background: 'rgba(26,31,46,0.8)', border: '1px solid #2d3748',
-  borderRadius: '12px', padding: '24px', marginBottom: '20px',
-}
-const label   = { fontSize: '13px', color: '#a0aec0', marginBottom: '6px', fontWeight: 600 }
-const select  = {
-  background: '#0f1117', border: '1px solid #2d3748', borderRadius: '8px',
-  padding: '10px 14px', color: '#e2e8f0', fontSize: '13px', outline: 'none', width: '100%'
-}
-const input   = { ...select }
-const textarea = { ...input, height: '70px', resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' }
-const btn = (color = '#2563eb') => ({
-  background: `linear-gradient(90deg, ${color}, #7c3aed)`, color: 'white',
-  border: 'none', borderRadius: '8px', padding: '10px 24px',
-  cursor: 'pointer', fontWeight: 700, fontSize: '14px', marginRight: '12px',
-})
-const statusBox = (ok) => ({
-  display: 'inline-block', padding: '4px 14px', borderRadius: '20px', fontWeight: 700,
-  fontSize: '14px', background: ok ? 'rgba(52,211,153,0.15)' : 'rgba(252,129,129,0.15)',
-  color: ok ? '#34d399' : '#fc8181', border: `1px solid ${ok ? '#34d399' : '#fc8181'}`,
-})
-
-function KeyDisplay({ keyPair }) {
-  if (!keyPair) return null
-  return (
-    <div style={{ ...card, background: 'rgba(37,99,235,0.08)', borderColor: '#3b82f6' }}>
-      <h3 style={{ color: '#60a5fa', marginBottom: '14px', fontSize: '14px' }}>✅ Key Pair Generated</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '12px' }}>
-        <div>
-          <div style={{ color: '#34d399', fontWeight: 700, marginBottom: '6px' }}>PUBLIC KEY (share freely)</div>
-          <div style={{ fontFamily: 'monospace', background: '#0f1117', borderRadius: '6px', padding: '10px', wordBreak: 'break-all', color: '#a0aec0' }}>
-            e = {keyPair.public_key.e.toString()}<br/>
-            n = {keyPair.public_key.n.toString().slice(0,60)}…
-          </div>
-        </div>
-        <div>
-          <div style={{ color: '#fc8181', fontWeight: 700, marginBottom: '6px' }}>PRIVATE KEY (keep secret)</div>
-          <div style={{ fontFamily: 'monospace', background: '#0f1117', borderRadius: '6px', padding: '10px', wordBreak: 'break-all', color: '#a0aec0' }}>
-            d = {keyPair.private_key.d.toString().slice(0,60)}…<br/>
-            phi_n = {keyPair.private_key.phi_n.toString().slice(0,50)}…
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function RSAPanel() {
-  const [bits,    setBits]    = useState('1024')
+  const [bits, setBits] = useState('1024')
   const [keyPair, setKeyPair] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [keyLoading, setKeyLoading] = useState(false)
+  const [keyError, setKeyError] = useState('')
 
-  // Sign/Verify state
-  const [signText,     setSignText]     = useState('Hello, IIIT Bhopal! This is a signed message.')
-  const [signature,    setSignature]    = useState('')
-  const [signResult,   setSignResult]   = useState(null)
+  // Signing state
+  const [signMessage, setSignMessage] = useState('Transaction Approved: Transfer $50,000 to Account #8492')
+  const [signature, setSignature] = useState('')
+  const [signStats, setSignStats] = useState(null)
+  const [signLoading, setSignLoading] = useState(false)
   const [verifyResult, setVerifyResult] = useState(null)
-  const [signLoading,  setSignLoading]  = useState(false)
-  const [verifyLoading,setVerifyLoading]= useState(false)
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [copyNotice, setCopyNotice] = useState('')
 
-  const keygen = async () => {
-    setLoading(true); setError('')
-    setKeyPair(null); setSignResult(null); setVerifyResult(null); setSignature('')
+  const copyToClipboard = (text, label) => {
+    if (!text) return
+    navigator.clipboard.writeText(text)
+    setCopyNotice(label)
+    setTimeout(() => setCopyNotice(''), 2000)
+  }
+
+  // Key Generation
+  const handleKeygen = async () => {
+    setKeyLoading(true)
+    setKeyError('')
+    setKeyPair(null)
+    setSignature('')
+    setSignStats(null)
+    setVerifyResult(null)
     try {
-      const { data } = await axios.post('/api/rsa/keygen', { bits: parseInt(bits) })
-      setKeyPair(data)
-    } catch (e) {
-      setError(e.response?.data?.detail || e.message)
+      const res = await axios.post('/api/rsa/keygen', {
+        bits: parseInt(bits, 10),
+      })
+      setKeyPair(res.data)
+    } catch (err) {
+      setKeyError(err.response?.data?.detail || 'Key generation failed.')
     } finally {
-      setLoading(false)
+      setKeyLoading(false)
     }
   }
 
-  const sign = async () => {
-    if (!keyPair) { setError('Generate a key pair first.'); return }
-    setSignLoading(true); setSignResult(null); setVerifyResult(null)
+  // Sign Message (Blinded-Adaptive)
+  const handleSign = async () => {
+    if (!keyPair) {
+      setKeyError('Please generate an RSA key pair first.')
+      return
+    }
+    setSignLoading(true)
+    setVerifyResult(null)
     try {
-      const { data } = await axios.post('/api/rsa/sign', {
-        text:  signText,
-        d:     keyPair.private_key.d,
-        n:     keyPair.private_key.n,
-        p:     keyPair.private_key.p,
-        q:     keyPair.private_key.q,
+      const res = await axios.post('/api/rsa/sign', {
+        text: signMessage,
+        d: keyPair.private_key.d,
+        n: keyPair.private_key.n,
+        p: keyPair.private_key.p,
+        q: keyPair.private_key.q,
         phi_n: keyPair.private_key.phi_n,
       })
-      setSignResult(data)
-      setSignature(data.signature.toString())
-    } catch (e) {
-      setError(e.response?.data?.detail || e.message)
+      setSignature(res.data.signature)
+      setSignStats(res.data)
+    } catch (err) {
+      setKeyError(err.response?.data?.detail || 'Signing operation failed.')
     } finally {
       setSignLoading(false)
     }
   }
 
-  const verify = async (tamper = false) => {
-    if (!keyPair || !signature) { setError('Sign first.'); return }
-    setVerifyLoading(true); setVerifyResult(null)
+  // Verify Signature (ML-Adaptive)
+  const handleVerify = async (tampered = false) => {
+    if (!keyPair || !signature) return
+    setVerifyLoading(true)
+    setVerifyResult(null)
     try {
-      let sig = BigInt(signature)
-      if (tamper) sig = sig ^ 0xFFn
-      const { data } = await axios.post('/api/rsa/verify', {
-        text:      signText,
-        signature: sig.toString(),
-        e:         keyPair.public_key.e,
-        n:         keyPair.public_key.n,
+      let sigToSend = signature
+      if (tampered) {
+        // Alter last digit to simulate forged signature
+        const lastChar = sigToSend.slice(-1)
+        const alteredChar = lastChar === '5' ? '6' : '5'
+        sigToSend = sigToSend.slice(0, -1) + alteredChar
+      }
+
+      const res = await axios.post('/api/rsa/verify', {
+        text: signMessage,
+        signature: sigToSend,
+        e: keyPair.public_key.e,
+        n: keyPair.public_key.n,
       })
-      setVerifyResult({ ...data, tampered: tamper })
-    } catch (e) {
-      setError(e.response?.data?.detail || e.message)
+      setVerifyResult({
+        verified: res.data.verified,
+        tampered: tampered,
+        strategy: res.data.strategy_used,
+        time_ms: res.data.total_time_ms,
+      })
+    } catch (err) {
+      setKeyError(err.response?.data?.detail || 'Signature verification failed.')
     } finally {
       setVerifyLoading(false)
     }
   }
 
   return (
-    <div>
-      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px' }}>
-        🔐 Full RSA Key Lifecycle Pipeline
-      </h2>
-
-      <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid #2563eb', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', fontSize: '13px', color: '#93c5fd', lineHeight: 1.6 }}>
-        <strong>How it works:</strong> All private-key operations (keygen, sign, decrypt) use the{' '}
-        <strong>Blinded-Adaptive</strong> engine (Euler totient randomization, side-channel immune).
-        All public-key operations (encrypt, verify) use the <strong>ML-Adaptive</strong> engine for
-        maximum throughput. Both are backed by the same ML dispatch layer.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Title */}
+      <div>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+          RSA Cryptosystem Integration
+        </h1>
+        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+          Demonstrates dual-mode deployment: Public-key verification routes via high-throughput ML-Adaptive dispatch; Private-key signing applies Euler Totient Random Exponent Blinding for complete side-channel immunity.
+        </p>
       </div>
 
-      {/* Key Generation */}
-      <div style={card}>
-        <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px' }}>① Key Generation</h3>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px' }}>
-          <div style={{ flex: 1 }}>
-            <div style={label}>RSA Key Size</div>
-            <select style={select} value={bits} onChange={e => setBits(e.target.value)}>
-              {['512','1024','2048'].map(b => (
-                <option key={b} value={b}>{b}-bit (RSA-{b})</option>
-              ))}
-            </select>
-          </div>
-          <button style={btn()} onClick={keygen} disabled={loading}>
-            {loading ? '⏳ Generating primes…' : '🔑 Generate Key Pair'}
+      {copyNotice && (
+        <div style={{
+          backgroundColor: '#064e3b',
+          color: '#a7f3d0',
+          padding: '8px 16px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          fontWeight: 600,
+        }}>
+          Copied {copyNotice} to clipboard.
+        </div>
+      )}
+
+      {/* Section 1: Keypair Generation */}
+      <div style={{
+        backgroundColor: '#0f1422',
+        border: '1px solid #1e2638',
+        borderRadius: '10px',
+        padding: '20px',
+      }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '12px' }}>
+          Keypair Generation
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+          <select
+            value={bits}
+            onChange={e => setBits(e.target.value)}
+            style={{
+              backgroundColor: '#161d2e',
+              border: '1px solid #273349',
+              color: '#e2e8f0',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              outline: 'none',
+            }}
+          >
+            <option value="512">RSA-512 (Demonstration)</option>
+            <option value="1024">RSA-1024 (Legacy Web Scale)</option>
+            <option value="2048">RSA-2048 (NIST Recommended)</option>
+          </select>
+
+          <button
+            onClick={handleKeygen}
+            disabled={keyLoading}
+            style={{
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              padding: '8px 18px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: keyLoading ? 'not-allowed' : 'pointer',
+              opacity: keyLoading ? 0.7 : 1,
+            }}
+          >
+            {keyLoading ? 'Generating Primes...' : 'Generate Key Pair'}
           </button>
         </div>
-        {error && <div style={{ color: '#fc8181', marginTop: '10px', fontSize: '13px' }}>{error}</div>}
+
+        {keyError && (
+          <div style={{ marginTop: '12px', fontSize: '13px', color: '#ef4444' }}>
+            {keyError}
+          </div>
+        )}
+
+        {/* Display Keypair */}
+        {keyPair && (
+          <div style={{
+            marginTop: '16px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '16px',
+          }}>
+            {/* Public Key */}
+            <div style={{
+              backgroundColor: '#070a10',
+              border: '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '14px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
+                  Public Key (e, n)
+                </span>
+                <button
+                  onClick={() => copyToClipboard(keyPair.public_key.n, 'Public Modulus')}
+                  style={{ backgroundColor: 'transparent', border: '1px solid #334155', color: '#94a3b8', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer' }}
+                >
+                  Copy Modulus
+                </button>
+              </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>
+                Exponent: <span style={{ color: '#f8fafc', fontFamily: 'monospace' }}>{keyPair.public_key.e}</span> (F4 constant)
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', wordBreak: 'break-all', maxHeight: '60px', overflowY: 'auto' }}>
+                n = {keyPair.public_key.n}
+              </div>
+            </div>
+
+            {/* Private Key */}
+            <div style={{
+              backgroundColor: '#070a10',
+              border: '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '14px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase' }}>
+                  Private Key (d, phi_n)
+                </span>
+                <button
+                  onClick={() => copyToClipboard(keyPair.private_key.d, 'Private Exponent')}
+                  style={{ backgroundColor: 'transparent', border: '1px solid #334155', color: '#94a3b8', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer' }}
+                >
+                  Copy Exponent
+                </button>
+              </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>
+                Side-Channel Protection: <span style={{ color: '#10b981', fontWeight: 600 }}>Active (Blinding Salt r)</span>
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', wordBreak: 'break-all', maxHeight: '60px', overflowY: 'auto' }}>
+                d = {keyPair.private_key.d}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <KeyDisplay keyPair={keyPair} />
-
-      {/* Sign / Verify */}
+      {/* Section 2: Digital Signature & Verification */}
       {keyPair && (
-        <div style={card}>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px' }}>② Sign & Verify (SHA-256)</h3>
-          <div style={{ marginBottom: '12px' }}>
-            <div style={label}>Message to Sign</div>
-            <textarea
-              style={textarea}
-              value={signText}
-              onChange={e => setSignText(e.target.value)}
-            />
+        <div style={{
+          backgroundColor: '#0f1422',
+          border: '1px solid #1e2638',
+          borderRadius: '10px',
+          padding: '20px',
+        }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', marginBottom: '12px' }}>
+            Digital Signature & Authentication Pipeline
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-            <button style={btn('#059669')} onClick={sign} disabled={signLoading}>
-              {signLoading ? '⏳ Signing…' : '✍️ Sign (Blinded-Adaptive)'}
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+            Message Payload to Authenticate
+          </label>
+          <input
+            type="text"
+            value={signMessage}
+            onChange={e => setSignMessage(e.target.value)}
+            style={{
+              width: '100%',
+              backgroundColor: '#090d16',
+              border: '1px solid #1e2638',
+              borderRadius: '6px',
+              color: '#f8fafc',
+              fontSize: '13px',
+              padding: '10px 12px',
+              boxSizing: 'border-box',
+              outline: 'none',
+              marginBottom: '14px',
+            }}
+          />
+
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleSign}
+              disabled={signLoading}
+              style={{
+                backgroundColor: '#059669',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 18px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: signLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {signLoading ? 'Signing...' : 'Sign with Private Key (Blinded)'}
             </button>
+
+            {signature && (
+              <>
+                <button
+                  onClick={() => handleVerify(false)}
+                  disabled={verifyLoading}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    color: '#38bdf8',
+                    border: '1px solid #334155',
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: verifyLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {verifyLoading ? 'Verifying...' : 'Verify Authenticity'}
+                </button>
+
+                <button
+                  onClick={() => handleVerify(true)}
+                  disabled={verifyLoading}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    color: '#f87171',
+                    border: '1px solid #451a1a',
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: verifyLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Simulate Forgery / Tamper Attack
+                </button>
+              </>
+            )}
           </div>
 
-          {signResult && (
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '12px' }}>
-              <div style={{ color: '#34d399', fontWeight: 700, marginBottom: '8px' }}>
-                ✅ Signed in {signResult.total_time_ms?.toFixed(2)} ms · Strategy: {signResult.strategy_used}
-              </div>
-              <div style={{ fontFamily: 'monospace', color: '#a0aec0', wordBreak: 'break-all' }}>
-                sig = {signResult.signature?.toString().slice(0, 80)}…
-              </div>
-            </div>
-          )}
-
+          {/* Signature Output */}
           {signature && (
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button style={btn('#2563eb')} onClick={() => verify(false)} disabled={verifyLoading}>
-                {verifyLoading ? '⏳ Verifying…' : '✅ Verify (ML-Adaptive)'}
-              </button>
-              <button style={btn('#dc2626')} onClick={() => verify(true)} disabled={verifyLoading}>
-                🔨 Verify Tampered Signature
-              </button>
+            <div style={{
+              marginTop: '16px',
+              backgroundColor: '#070a10',
+              border: '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '14px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>
+                  Cryptographic Signature (d_blinded execution: {signStats?.total_time_ms} ms)
+                </span>
+                <button
+                  onClick={() => copyToClipboard(signature, 'Signature')}
+                  style={{ backgroundColor: 'transparent', border: '1px solid #334155', color: '#94a3b8', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer' }}
+                >
+                  Copy Signature
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', color: '#cbd5e1', fontFamily: 'monospace', wordBreak: 'break-all', maxHeight: '50px', overflowY: 'auto' }}>
+                {signature}
+              </div>
             </div>
           )}
 
+          {/* Verification Result Banner */}
           {verifyResult && (
-            <div style={{ marginTop: '16px', padding: '14px', borderRadius: '8px', background: verifyResult.verified ? 'rgba(52,211,153,0.1)' : 'rgba(252,129,129,0.1)', border: `1px solid ${verifyResult.verified ? '#34d399' : '#fc8181'}` }}>
-              <div style={statusBox(verifyResult.verified)}>
-                {verifyResult.verified ? '✅ SIGNATURE VALID' : '❌ SIGNATURE INVALID'}
+            <div style={{
+              marginTop: '16px',
+              padding: '14px 18px',
+              borderRadius: '8px',
+              backgroundColor: verifyResult.verified ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${verifyResult.verified ? '#059669' : '#dc2626'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  color: verifyResult.verified ? '#10b981' : '#ef4444',
+                }}>
+                  {verifyResult.verified ? 'Signature Valid & Authenticated' : 'Signature Verification Rejected'}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                  {verifyResult.tampered
+                    ? 'Forgery detection confirmed: Mutated signature bits failed modular equivalence verification.'
+                    : `Verified via ${verifyResult.strategy} in ${verifyResult.time_ms} ms.`}
+                </div>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#a0aec0' }}>
-                {verifyResult.tampered
-                  ? 'Tampered signature correctly rejected — cryptographic integrity confirmed.'
-                  : `Verified in ${verifyResult.total_time_ms?.toFixed(2)} ms · Strategy: ${verifyResult.strategy_used}`}
+
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: verifyResult.verified ? '#10b981' : '#ef4444',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>
+                {verifyResult.verified ? 'PASS' : 'FAIL'}
               </div>
             </div>
           )}
