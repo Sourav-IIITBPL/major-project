@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import axios from 'axios'
+import api from '../api'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
@@ -38,7 +38,7 @@ export default function BenchmarkPanel() {
     setError('')
     setData(null)
     try {
-      const res = await axios.post('/api/benchmark', {
+      const res = await api.post('/api/benchmark', {
         bit_length: parseInt(bitLen, 10),
         profile: profile,
         trials: parseInt(trials, 10),

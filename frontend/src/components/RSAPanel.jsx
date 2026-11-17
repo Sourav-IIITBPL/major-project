@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 export default function RSAPanel() {
   const [bits, setBits] = useState('1024')
@@ -32,7 +32,7 @@ export default function RSAPanel() {
     setSignStats(null)
     setVerifyResult(null)
     try {
-      const res = await axios.post('/api/rsa/keygen', {
+      const res = await api.post('/api/rsa/keygen', {
         bits: parseInt(bits, 10),
       })
       setKeyPair(res.data)
@@ -52,7 +52,7 @@ export default function RSAPanel() {
     setSignLoading(true)
     setVerifyResult(null)
     try {
-      const res = await axios.post('/api/rsa/sign', {
+      const res = await api.post('/api/rsa/sign', {
         text: signMessage,
         d: keyPair.private_key.d,
         n: keyPair.private_key.n,
@@ -83,7 +83,7 @@ export default function RSAPanel() {
         sigToSend = sigToSend.slice(0, -1) + alteredChar
       }
 
-      const res = await axios.post('/api/rsa/verify', {
+      const res = await api.post('/api/rsa/verify', {
         text: signMessage,
         signature: sigToSend,
         e: keyPair.public_key.e,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 const BACKEND_THEMES = {
   python_bigint: { color: '#38bdf8', badge: 'Software' },
@@ -18,7 +18,7 @@ export default function BackendsPanel() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    axios.get('/api/backends')
+    api.get('/api/backends')
       .then(res => setBackends(res.data.backends))
       .catch(() => {})
   }, [])
@@ -27,7 +27,7 @@ export default function BackendsPanel() {
     setGenLoading(true)
     setError('')
     try {
-      const res = await axios.post('/api/generate-exponent', {
+      const res = await api.post('/api/generate-exponent', {
         bits: bits,
         profile: 'bursty',
       })
@@ -49,7 +49,7 @@ export default function BackendsPanel() {
     setError('')
     setDispatchResult(null)
     try {
-      const res = await axios.post('/api/backends/dispatch', {
+      const res = await api.post('/api/backends/dispatch', {
         exponent: trimmed,
         backend: selectedBackend,
       })

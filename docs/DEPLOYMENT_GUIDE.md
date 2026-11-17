@@ -153,22 +153,91 @@ sudo certbot --nginx -d your-domain.com
 
 ---
 
-## ☁ Option 5: Free Cloud Platforms (Render, Railway, Fly.io)
+## ☁ Option 5: Deploying Backend to Render & Frontend to Vercel (Step-by-Step)
 
-### Deploying to Render (Web Service)
-1. Fork or push this repository to GitHub.
-2. Create a new **Web Service** on [Render.com](https://render.com).
-3. Connect your GitHub repository.
-4. Set the following build and start parameters:
-   - **Environment:** `Docker` (Render will automatically detect `Dockerfile`)
-   - **Plan:** Free or Starter
-   - **Port:** `8000`
-5. Click **Create Web Service**. Render builds the image and gives you a live public HTTPS URL (e.g. `https://crypto-engine.onrender.com`).
+This distributed cloud architecture gives you the best performance:
+- **Backend on Render:** Hosts FastAPI with high computational throughput and large BigInt support.
+- **Frontend on Vercel:** Hosted on Vercel's global Edge CDN with sub-second asset delivery.
 
-### Deploying to Railway
-1. Go to [Railway.app](https://railway.app), click **New Project** -> **Deploy from GitHub repo**.
-2. Select your repository. Railway automatically detects the `Dockerfile` and deploys both backend and frontend.
-3. In settings, generate a public domain name.
+```
+┌──────────────────────────────────────┐         REST API calls          ┌──────────────────────────────────────────────┐
+│  Vercel Global Edge CDN (Frontend)   │ ──────────────────────────────> │   Render Python Web Service (Backend)        │
+│  https://crypto-engine.vercel.app    │  (via VITE_API_BASE_URL)        │   https://crypto-engine-backend.onrender.com │
+└──────────────────────────────────────┘                                 └──────────────────────────────────────────────┘
+```
+
+---
+
+### Step 1: Push Project to GitHub
+
+Ensure your local repository is committed and pushed to GitHub:
+```bash
+git add .
+git commit -m "feat: configure deployment for Render and Vercel"
+git push origin main
+```
+
+---
+
+### Step 2: Deploy Backend to Render
+
+1. Go to [dashboard.render.com](https://dashboard.render.com) and log in.
+2. Click **New +** -> **Web Service**.
+3. Select your GitHub repository (`major-project`).
+4. Configure the settings:
+   - **Name:** `crypto-engine-backend` (or your preferred name)
+   - **Region:** Any (e.g., Oregon, Frankfurt)
+   - **Branch:** `main`
+   - **Root Directory:** Leave blank (or `./`)
+   - **Runtime:** `Python 3`
+   - **Build Command:**
+     ```bash
+     pip install --upgrade pip && pip install -r requirements.txt
+     ```
+   - **Start Command:**
+     ```bash
+     uvicorn backend.api:app --host 0.0.0.0 --port $PORT
+     ```
+   - **Plan:** Free
+5. Under **Advanced Settings**:
+   - **Health Check Path:** `/api/health`
+   - Add Environment Variable:
+     - `PYTHON_VERSION` = `3.12.3`
+6. Click **Create Web Service**.
+7. Render will build and deploy the backend. Once active, note your live backend URL:
+   `https://<YOUR-RENDER-NAME>.onrender.com`
+   *(Test by opening `https://<YOUR-RENDER-NAME>.onrender.com/api/health` in your browser)*
+
+> [!NOTE]
+> On Render's Free tier, services spin down after 15 minutes of inactivity. The first request after sleep may take ~30–45 seconds while the instance wakes up.
+
+---
+
+### Step 3: Deploy Frontend to Vercel
+
+1. Go to [vercel.com/new](https://vercel.com/new) and log in with GitHub.
+2. Under **Import Git Repository**, select your `major-project` repository.
+3. In the **Configure Project** screen:
+   - **Project Name:** `crypto-engine-dashboard` (or preferred)
+   - **Framework Preset:** `Vite`
+   - **Root Directory:** Click **Edit** and choose `frontend` 👈 *(Crucial Step!)*
+   - **Build Command:** `npm run build` (default)
+   - **Output Directory:** `dist` (default)
+4. Expand **Environment Variables**:
+   - **Key:** `VITE_API_BASE_URL`
+   - **Value:** `https://<YOUR-RENDER-NAME>.onrender.com` *(Replace with your actual Render URL from Step 2, without trailing slash)*
+5. Click **Deploy**.
+6. Vercel will build and deploy the React 19 application in ~30 seconds, generating your live frontend URL (e.g. `https://crypto-engine-dashboard.vercel.app`).
+
+---
+
+### Step 4: Verify the Live Deployment
+
+1. Open your live **Vercel URL** in any web browser or mobile device.
+2. Go to **Exponent Analyzer**: Click **Generate Exponent** (1024-bit) then **Analyze**.
+3. Go to **RSA Full Lifecycle**: Click **Generate Keypair**, **Sign Message**, and **Verify Signature**.
+4. All calls will seamlessly execute against your Render backend!
+
 
 ---
 

@@ -150,7 +150,7 @@ docker compose up -d
 ```
 * **Production Web UI & APIs:** Open `http://localhost:8000` (serves compiled React 19 UI & REST APIs).
 * **Interactive API Documentation:** Open `http://localhost:8000/docs` in your browser.
-* **Complete Deployment Guide:** See [docs/DEPLOYMENT_GUIDE.md](file:///home/sourav/major-project/docs/DEPLOYMENT_GUIDE.md) for Linux VPS (systemd + Nginx) and Cloud hosting (Render/Railway).
+* **Complete Deployment Guide:** See [docs/DEPLOYMENT_GUIDE.md](file:///home/sourav/major-project/docs/DEPLOYMENT_GUIDE.md) for full step-by-step instructions on deploying the Backend to **Render** and Frontend to **Vercel**, as well as Docker & Linux VPS.
 
 
 ### 4.3 Run CLI Pipeline & Test Suites

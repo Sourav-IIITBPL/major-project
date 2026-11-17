@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import axios from 'axios'
+import api from '../api'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 
 const STRATEGY_BADGES = {
@@ -24,7 +24,7 @@ export default function ExponentAnalyzer() {
     setGenLoading(true)
     setError('')
     try {
-      const res = await axios.post('/api/generate-exponent', {
+      const res = await api.post('/api/generate-exponent', {
         bits: parseInt(bitLen, 10),
         profile: profile,
       })
@@ -46,7 +46,7 @@ export default function ExponentAnalyzer() {
     setLoading(true)
     setError('')
     try {
-      const res = await axios.post('/api/analyze', {
+      const res = await api.post('/api/analyze', {
         exponent: trimmed,
         w: 3,
       })
