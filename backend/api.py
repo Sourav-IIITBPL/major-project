@@ -9,6 +9,7 @@ prevent IEEE 754 floating-point truncation in browser JavaScript.
 
 import sys
 import os
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 import math
 import secrets
 import time
